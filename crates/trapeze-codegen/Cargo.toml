@@ -1,0 +1,12 @@
+[package]
+name = "trapeze-codegen"
+description = "Code generator for trapeze"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+readme.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[dependencies]
+prost-build = { workspace = true }

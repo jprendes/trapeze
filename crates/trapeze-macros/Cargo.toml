@@ -1,0 +1,20 @@
+[package]
+name = "trapeze-macros"
+description = "Macros for trapeze"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+readme.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+trapeze-codegen = { workspace = true }
+syn = { version = "2", features = ["visit-mut"] }
+proc-macro2 = "1"
+quote = "1"
+anyhow = "1"
+tempfile = "3"

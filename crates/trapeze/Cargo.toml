@@ -1,0 +1,17 @@
+[package]
+name = "trapeze"
+description = "A rust implementation of ttrpc"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+readme.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[dependencies]
+trapeze-codegen = { workspace = true }
+trapeze-macros = { workspace = true }
+prost = { workspace = true }
+tokio = { workspace = true, features = ["io-util", "rt", "sync", "time"] }
+thiserror = "1"
+once_cell = "1"

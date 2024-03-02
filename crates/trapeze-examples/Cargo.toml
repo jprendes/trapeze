@@ -1,0 +1,15 @@
+[package]
+name = "trapeze-examples"
+description = "Examples for trapeze"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+readme.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[dependencies]
+trapeze = { workspace = true }
+prost = { workspace = true }
+tokio = { workspace = true, features = ["macros", "net", "fs", "signal"] }
+anyhow = "1"
