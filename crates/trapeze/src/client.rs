@@ -135,16 +135,6 @@ impl<Rx: AsyncRead, Tx: AsyncWrite> ClientInner<Rx, Tx> {
         let metadata = context.metadata.clone().into();
         let timeout = context.timeout;
 
-        let response = tokio::spawn(async move {
-            if timeout.is_zero() {
-                receiver.recv().await
-            } else {
-                tokio::time::timeout(*timeout, async move { receiver.recv().await })
-                    .await
-                    .unwrap_or_else(|_| Some(REQUEST_TIMEOUT_ENCODED.clone()))
-            }
-        });
-
         let data = Request {
             service: service.to_string(),
             method: method.to_string(),
@@ -161,10 +151,15 @@ impl<Rx: AsyncRead, Tx: AsyncWrite> ClientInner<Rx, Tx> {
             .write_message(&Message::Request { id, data })
             .await?;
 
+        let response = if timeout.is_zero() {
+            receiver.recv().await
+        } else {
+            tokio::time::timeout(*timeout, async move { receiver.recv().await })
+                .await
+                .unwrap_or_else(|_| Some(REQUEST_TIMEOUT_ENCODED.clone()))
+        };
+
         let res: Response = response
-            .await
-            .ok()
-            .flatten()
             .ok_or_else(|| Status {
                 code: Code::Cancelled.into(),
                 message: "Channel closed".to_string(),
