@@ -25,7 +25,7 @@ pub struct ServerInner<Rx: AsyncRead, Tx: AsyncWrite> {
     rx: RwLock<Rx>,
     tx: RwLock<Tx>,
     services: HashMap<String, Arc<dyn Service>>,
-    streams: IdMap<()>,
+    streams: RwLock<IdMap<()>>,
 }
 
 impl<Rx: AsyncRead, Tx: AsyncWrite> Clone for Server<Rx, Tx> {
@@ -135,7 +135,7 @@ impl<Rx: AsyncRead, Tx: AsyncWrite> ServerInner<Rx, Tx> {
         id: u32,
         req: Encoded,
     ) -> Result<(), RequestHandlingError> {
-        let Some(guard) = self.streams.claim(id, ()).await else {
+        let Some(guard) = self.streams.write().await.claim(id, ()) else {
             return Err(RequestHandlingError::IdInUse(id));
         };
         let req = req.decode()?;

@@ -24,7 +24,7 @@ pub struct Client<Rx: AsyncRead, Tx: AsyncWrite> {
 pub struct ClientInner<Rx: AsyncRead, Tx: AsyncWrite> {
     rx: RwLock<Rx>,
     tx: RwLock<Tx>,
-    streams: IdMap<Sender<Encoded>>,
+    streams: RwLock<IdMap<Sender<Encoded>>>,
 }
 
 impl<Rx: AsyncRead, Tx: AsyncWrite> Clone for Client<Rx, Tx> {
@@ -113,7 +113,7 @@ impl<Rx: AsyncRead, Tx: AsyncWrite> ClientInner<Rx, Tx> {
     }
 
     async fn handle_response(self: &Arc<Self>, id: u32, data: Encoded) {
-        if let Some(sender) = self.streams.borrow(id).await {
+        if let Some(sender) = self.streams.read().await.borrow(id) {
             let _ = sender.send(data).await;
         }
     }
@@ -129,7 +129,7 @@ impl<Rx: AsyncRead, Tx: AsyncWrite> ClientInner<Rx, Tx> {
 
         let (sender, mut receiver) = channel(1);
 
-        let guard = self.streams.claim_any(sender).await;
+        let guard = self.streams.write().await.claim_any(sender);
         let id = guard.id();
 
         let metadata = context.metadata.clone().into();

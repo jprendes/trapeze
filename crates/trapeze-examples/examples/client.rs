@@ -12,7 +12,7 @@ use common::*;
 async fn main() -> anyhow::Result<()> {
     let conn = UnixStream::connect(ADDRESS).await?;
 
-    let client = Client::new(conn).with_metadata(&[
+    let client = Client::new(conn).with_metadata([
         ("key-1", "value-1-1"),
         ("key-1", "value-1-2"),
         ("key-2", "value-2"),
