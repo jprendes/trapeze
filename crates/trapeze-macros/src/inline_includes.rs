@@ -2,9 +2,8 @@ use std::fs::read_to_string;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use syn::parse_str;
 use syn::visit_mut::{visit_item_mut, VisitMut};
-use syn::{File, Item, LitStr};
+use syn::{parse_str, File, Item, LitStr};
 
 struct InlineIncludesVisitor {
     out_dir: PathBuf,

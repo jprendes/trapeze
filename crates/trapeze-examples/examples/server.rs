@@ -1,27 +1,32 @@
+use futures::stream::StreamExt as _;
 use tokio::fs::remove_file;
 use tokio::net::UnixListener;
+use tokio::pin;
 use tokio::signal::ctrl_c;
 use tokio::time::sleep;
-use trapeze::{context::get_context, Code, Result, ServerBuilder, Status};
-use types::Interface;
-
-use grpc::{AgentService as _, Health as _};
+use trapeze::prelude::Stream;
+use trapeze::stream::try_stream;
+use trapeze::{get_context, Code, Result, Server, Status};
 
 mod common;
-use common::*;
+
+use common::{grpc, streaming, types, ADDRESS};
+use grpc::*;
+use streaming::*;
+use types::*;
 
 #[derive(Clone, Default)]
-struct HealthService;
-impl grpc::Health for HealthService {
-    async fn check(&self, _req: grpc::CheckRequest) -> Result<grpc::HealthCheckResponse> {
+struct HealthProvider;
+impl Health for HealthProvider {
+    async fn check(&self, _req: CheckRequest) -> Result<HealthCheckResponse> {
         println!("> check() - {:?}", get_context());
         sleep(std::time::Duration::from_secs(10)).await;
         Err(Status::new(Code::NotFound, "Just for fun"))
     }
 
-    async fn version(&self, _req: grpc::CheckRequest) -> Result<grpc::VersionCheckResponse> {
+    async fn version(&self, _req: CheckRequest) -> Result<VersionCheckResponse> {
         println!("> version() - {:?}", get_context());
-        Ok(grpc::VersionCheckResponse {
+        Ok(VersionCheckResponse {
             agent_version: "mock.0.1".to_string(),
             grpc_version: "0.0.1".to_string(),
         })
@@ -29,14 +34,14 @@ impl grpc::Health for HealthService {
 }
 
 #[derive(Clone, Default)]
-struct AgentService;
-impl grpc::AgentService for AgentService {
-    async fn list_interfaces(&self, _req: grpc::ListInterfacesRequest) -> Result<grpc::Interfaces> {
+struct AgentProvider;
+impl AgentService for AgentProvider {
+    async fn list_interfaces(&self, _req: ListInterfacesRequest) -> Result<Interfaces> {
         println!("> list_interfaces() - {:?}", get_context());
-        Ok(grpc::Interfaces {
+        Ok(Interfaces {
             interfaces: vec![
                 Interface {
-                    name: "fist".to_string(),
+                    name: "first".to_string(),
                     ..Default::default()
                 },
                 Interface {
@@ -48,19 +53,121 @@ impl grpc::AgentService for AgentService {
     }
 }
 
+#[derive(Clone, Default)]
+struct StreamingProvider;
+impl Streaming for StreamingProvider {
+    async fn echo(&self, mut echo_payload: EchoPayload) -> trapeze::Result<EchoPayload> {
+        println!("> echo() - {:?}", get_context());
+        echo_payload.seq += 1;
+        Ok(echo_payload)
+    }
+
+    fn echo_stream(
+        &self,
+        echo_payloads: impl Stream<Item = EchoPayload> + Send,
+    ) -> impl Stream<Item = Result<EchoPayload>> + Send {
+        println!("> echo_stream() - {:?}", get_context());
+        try_stream! {
+            for await mut echo_payload in echo_payloads {
+                echo_payload.seq += 1;
+                yield echo_payload;
+            }
+        }
+    }
+
+    async fn sum_stream(&self, parts: impl Stream<Item = Part> + Send) -> Result<Sum> {
+        println!("> sum_stream() - {:?}", get_context());
+        pin!(parts);
+        let mut sum = Sum { num: 0, sum: 0 };
+        while let Some(part) = parts.next().await {
+            sum.num += 1;
+            sum.sum += part.add;
+        }
+        Ok(sum)
+    }
+
+    fn divide_stream(&self, sum: Sum) -> impl Stream<Item = Result<Part>> + Send {
+        println!("> divide_stream() - {:?}", get_context());
+        try_stream! {
+            let mut total = 0i32;
+            let add = sum.sum / sum.num;
+
+            for _ in 1..sum.num {
+                total += add;
+                yield Part { add };
+            }
+
+            let add = sum.sum - total;
+            yield Part { add };
+        }
+    }
+
+    async fn echo_null(&self, echo_payloads: impl Stream<Item = EchoPayload> + Send) -> Result<()> {
+        println!("> echo_null() - {:?}", get_context());
+        pin!(echo_payloads);
+        let mut echo_payloads = echo_payloads.enumerate();
+        while let Some((i, echo_payload)) = echo_payloads.next().await {
+            let i = i as u32;
+            if echo_payload.seq != i {
+                Err(Status::new(Code::InvalidArgument, "Invalid sequence"))?;
+            }
+            if echo_payload.msg != "non-empty empty" {
+                Err(Status::new(Code::InvalidArgument, "Invalid message"))?;
+            }
+        }
+        Ok(())
+    }
+
+    fn echo_null_stream(
+        &self,
+        echo_payloads: impl Stream<Item = EchoPayload> + Send,
+    ) -> impl Stream<Item = Result<()>> + Send {
+        println!("> echo_null_stream() - {:?}", get_context());
+        try_stream! {
+            for await (i, echo_payload) in echo_payloads.enumerate() {
+                let i = i as u32;
+                if echo_payload.seq != i {
+                    Err(Status::new(Code::InvalidArgument, "Invalid sequence"))?;
+                }
+                if echo_payload.msg != "non-empty empty" {
+                    Err(Status::new(Code::InvalidArgument, "Invalid message"))?;
+                }
+                yield ();
+            }
+        }
+    }
+
+    fn echo_default_value(
+        &self,
+        echo_payload: EchoPayload,
+    ) -> impl Stream<Item = Result<EchoPayload>> + Send {
+        println!("> echo_default_value() - {:?}", get_context());
+        try_stream! {
+            if echo_payload.seq != 0 || !echo_payload.msg.is_empty() {
+                return Err(Status::new(Code::Unknown, "Expect a request with empty payload to verify #208"))?;
+            }
+
+            yield echo_payload;
+        }
+    }
+}
+
 #[tokio::main(flavor = "current_thread")]
-async fn main() -> anyhow::Result<()> {
+async fn main() {
     let _ = remove_file(ADDRESS).await;
-    let listener = UnixListener::bind(ADDRESS)?;
+    let listener = UnixListener::bind(ADDRESS).unwrap();
 
     tokio::spawn(async move {
         loop {
             if let Ok((conn, _)) = listener.accept().await {
-                ServerBuilder::new()
-                    .add_service(AgentService::service())
-                    .add_service(HealthService::service())
-                    .build(conn)
-                    .start();
+                tokio::spawn(async move {
+                    Server::new(conn)
+                        .add_service(AgentProvider::service())
+                        .add_service(HealthProvider::service())
+                        .add_service(StreamingProvider::service())
+                        .start()
+                        .await
+                });
             }
         }
     });
@@ -71,6 +178,4 @@ async fn main() -> anyhow::Result<()> {
     ctrl_c().await.expect("Failed to wait for Ctrl+C.");
 
     let _ = remove_file(ADDRESS).await;
-
-    Ok(())
 }

@@ -1,25 +1,80 @@
-use std::future::Future;
-use std::pin::Pin;
+use std::fmt::Display;
+use std::future::{ready, Ready};
+use std::marker::PhantomData;
 
-use crate::encoded::Encoded;
-use crate::{Code, Result, Status};
+use futures::stream::{once, Once};
+
+use crate::server::method_handlers::MethodHandler;
+use crate::{Result, Status};
 
 pub trait Service: Send + Sync {
     fn name(&self) -> &'static str;
-    fn dispatch<'a, 'b>(
-        &'a self,
-        method: &'b str,
-        _payload: Encoded,
-    ) -> Pin<Box<dyn Future<Output = Result<Encoded>> + Send + 'a>>
-    where
-        Self: Sync + 'a,
-        'b: 'a,
-    {
-        Box::pin(async move {
-            Ok(Encoded::encode(&Status::new(
-                Code::NotFound,
-                format!("/{}/{method} is not supported", self.name()),
-            ))?)
-        })
+
+    fn dispatch(&self, method: String) -> Box<dyn MethodHandler + Send + '_> {
+        let service = self.name();
+        Box::new(MethodNotFound { service, method })
+    }
+}
+
+pub struct UnaryMethod<Input, Output, F> {
+    pub(crate) f: F,
+    _phantom: PhantomData<(Input, Output)>,
+}
+
+pub struct ServerStreamingMethod<Input, Output, F> {
+    pub(crate) f: F,
+    _phantom: PhantomData<(Input, Output)>,
+}
+
+pub struct ClientStreamingMethod<Input, Output, F> {
+    pub(crate) f: F,
+    _phantom: PhantomData<(Input, Output)>,
+}
+
+pub struct DuplexStreamingMethod<Input, Output, F> {
+    pub(crate) f: F,
+    _phantom: PhantomData<(Input, Output)>,
+}
+
+pub struct MethodNotFound<S: Display + Send, M: Display + Send> {
+    pub service: S,
+    pub method: M,
+}
+
+impl<Input, Output, F> UnaryMethod<Input, Output, F> {
+    pub fn new(f: F) -> Self {
+        let _phantom = Default::default();
+        Self { f, _phantom }
+    }
+}
+
+impl<Input, Output, F> ServerStreamingMethod<Input, Output, F> {
+    pub fn new(f: F) -> Self {
+        let _phantom = Default::default();
+        Self { f, _phantom }
+    }
+}
+
+impl<Input, Output, F> ClientStreamingMethod<Input, Output, F> {
+    pub fn new(f: F) -> Self {
+        let _phantom = Default::default();
+        Self { f, _phantom }
+    }
+}
+
+impl<Input, Output, F> DuplexStreamingMethod<Input, Output, F> {
+    pub fn new(f: F) -> Self {
+        let _phantom = Default::default();
+        Self { f, _phantom }
+    }
+}
+
+impl<S: Display + Send, M: Display + Send> MethodNotFound<S, M> {
+    pub fn into_future<T>(self) -> Ready<Result<T>> {
+        ready(Err(Status::method_not_found(&self.service, &self.method)))
+    }
+
+    pub fn into_stream<T>(self) -> Once<Ready<Result<T>>> {
+        once(self.into_future())
     }
 }

@@ -1,5 +1,3 @@
 "__method_proto_name__" => {
-    let payload = trapeze::encoded::Encoded::decode(&payload)?;
-    let response = super::__service_name__::__method_name__(&self.0, payload).await?;
-    Ok(trapeze::encoded::Encoded::encode(&response)?)
+    std::boxed::Box::new(trapeze::__codegen_prelude::__method_wrapper__::new(|input| self.0.__method_name__(input)))
 },

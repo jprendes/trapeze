@@ -10,31 +10,23 @@ pub mod __service_module_name__ {
         }
     }
 
-    impl<T: super::__service_name__> trapeze::service::Service for Service<T> {
+    impl<T: super::__service_name__> trapeze::__codegen_prelude::Service for Service<T> {
         fn name(&self) -> &'static str {
             "__service_package__.__service_proto_name__"
         }
 
-        fn dispatch<'a, 'b>(
-            &'a self,
-            method: &'b str,
-            payload: trapeze::encoded::Encoded,
-        ) -> std::pin::Pin<std::boxed::Box<dyn std::future::Future<Output = trapeze::Result<trapeze::encoded::Encoded>> + Send + 'a>>
-        where
-            Self: Sync + 'a,
-            'b: 'a
+        fn dispatch(
+            &self,
+            method: std::string::String,
+        ) -> std::boxed::Box<dyn trapeze::__codegen_prelude::MethodHandler + Send + '_>
         {
-            std::boxed::Box::pin(async move {
-                match method {
-                    __dispatch_branches__
-                    _ => {
-                        let code = trapeze::Code::NotFound;
-                        let message = format!("/__service_package__.__service_proto_name__/{method} is not supported");
-                        let response = trapeze::Status::new(code, message);
-                        Ok(trapeze::encoded::Encoded::encode(&response)?)
-                    },
-                }
-            })
+            match method.as_str() {
+                __dispatch_branches__
+                _ => {
+                    let service = self.name();
+                    std::boxed::Box::new(trapeze::__codegen_prelude::MethodNotFound { service, method })
+                },
+            }
         }
     }
 
@@ -51,6 +43,7 @@ pub mod __service_module_name__ {
     }
 }
 
+__service_comments__
 pub trait __service_name__: Send + Sync + 'static {
     __trait_methods__
 
@@ -59,6 +52,10 @@ pub trait __service_name__: Send + Sync + 'static {
     }
 }
 
-impl<Rx: trapeze::traits::AsyncRead, Tx: trapeze::traits::AsyncWrite> __service_name__ for trapeze::client::Client<Rx, Tx> {
+//pub fn __service_name__<T: __service_name__>(service: T) -> __service_module_name__::Service<T> {
+//    __service_module_name__::Service(service)
+//}
+
+impl __service_name__ for trapeze::Client {
     __client_methods__
 }

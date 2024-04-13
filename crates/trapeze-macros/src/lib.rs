@@ -1,5 +1,5 @@
-use std::path::PathBuf;
-use std::{env, path::Path};
+use std::env;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use proc_macro::TokenStream;

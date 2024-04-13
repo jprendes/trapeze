@@ -4,9 +4,8 @@ use std::ops::{Deref, DerefMut};
 use std::path::Path;
 
 pub use prost_build;
-
 pub use prost_build::{protoc_from_env, protoc_include_from_env};
-use prost_build::{Method, Service, ServiceGenerator};
+use prost_build::{Comments, Method, Service, ServiceGenerator};
 
 pub fn compile_protos(protos: &[impl AsRef<Path>], includes: &[impl AsRef<Path>]) -> Result<()> {
     Config::new().compile_protos(protos, includes)
@@ -64,35 +63,8 @@ fn camel2snake(name: impl AsRef<str>) -> String {
 fn make_trait_method(mut substitutions: HashMap<&'static str, String>, method: &Method) -> String {
     substitutions.extend(method_substitutions(method));
 
-    let Method {
-        client_streaming,
-        server_streaming,
-        ..
-    } = method;
-
-    if *client_streaming || *server_streaming {
-        panic!("Streaming server or client not supported");
-    }
-
     replace(include_str!("../templates/trait_method.rs"), substitutions)
 }
-
-/*
-fn make_trait_ctx_method(mut substitutions: HashMap<&'static str, String>, method: &Method) -> String {
-    let mut method = method.clone();
-
-    if method.input_type.starts_with("super::") {
-        method.input_type.insert_str(0, "super::");
-    }
-    if method.output_type.starts_with("super::") {
-        method.output_type.insert_str(0, "super::");
-    }
-
-    substitutions.extend(method_substitutions(&method));
-
-    replace(include_str!("../templates/trait_ctx_method.rs"), substitutions)
-}
-*/
 
 fn make_dispatch_branch(
     mut substitutions: HashMap<&'static str, String>,
@@ -141,6 +113,7 @@ impl ServiceGenerator for TtrpcServiceGenerator {
 
 fn service_substitutions(service: &Service) -> HashMap<&'static str, String> {
     let mut substitutions: HashMap<&'static str, String> = Default::default();
+    substitutions.insert("service_comments", format_comments(&service.comments, 0));
     substitutions.insert("service_name", service.name.clone());
     substitutions.insert("service_package", service.package.clone());
     substitutions.insert("service_proto_name", service.proto_name.clone());
@@ -150,12 +123,83 @@ fn service_substitutions(service: &Service) -> HashMap<&'static str, String> {
 
 fn method_substitutions(method: &Method) -> HashMap<&'static str, String> {
     let mut substitutions: HashMap<&'static str, String> = Default::default();
-    substitutions.insert("method_name", method.name.clone());
-    substitutions.insert("method_proto_name", method.proto_name.clone());
-    substitutions.insert("method_input_type", method.input_type.clone());
-    substitutions.insert("method_input_name", camel2snake(&method.input_type));
-    substitutions.insert("method_output_type", method.output_type.clone());
+    let Method {
+        name,
+        proto_name,
+        input_type,
+        output_type,
+        client_streaming,
+        server_streaming,
+        comments,
+        ..
+    } = method;
+
+    let input_name = camel2snake(input_type);
+
+    let wrapper = match (*client_streaming, *server_streaming) {
+        (false, false) => "UnaryMethod",
+        (false, true) => "ServerStreamingMethod",
+        (true, false) => "ClientStreamingMethod",
+        (true, true) => "DuplexStreamingMethod",
+    };
+
+    let request_handler = match (*client_streaming, *server_streaming) {
+        (false, false) => "handle_unary_request",
+        (false, true) => "handle_server_streaming_request",
+        (true, false) => "handle_client_streaming_request",
+        (true, true) => "handle_duplex_streaming_request",
+    };
+
+    let into_method_output = if *server_streaming {
+        format!("into_stream::<{output_type}>")
+    } else {
+        format!("into_future::<{output_type}>")
+    };
+
+    let input_type = if *client_streaming {
+        stream_for(input_type)
+    } else {
+        input_type.clone()
+    };
+
+    let output_type = if *server_streaming {
+        fallible_stream_for(output_type)
+    } else {
+        fallible_future_for(output_type)
+    };
+
+    substitutions.insert("method_comments", format_comments(comments, 1));
+    substitutions.insert("method_name", name.clone());
+    substitutions.insert("method_proto_name", proto_name.clone());
+    substitutions.insert("method_input_name", input_name);
+    substitutions.insert("method_input_type", input_type);
+    substitutions.insert("method_output_type", output_type);
+    substitutions.insert("method_wrapper", wrapper.to_string());
+    substitutions.insert("method_request_handler", request_handler.to_string());
+    substitutions.insert("into_method_output", into_method_output);
     substitutions
+}
+
+fn format_comments(comments: &Comments, indent_level: u8) -> String {
+    let mut formatted = String::new();
+    comments.append_with_indent(indent_level, &mut formatted);
+    formatted
+}
+
+fn future_for(ty: &str) -> String {
+    format!("impl trapeze::prelude::Future<Output = {ty}> + Send")
+}
+
+fn fallible_future_for(ty: &str) -> String {
+    future_for(&format!("trapeze::Result<{ty}>"))
+}
+
+fn stream_for(ty: &str) -> String {
+    format!("impl trapeze::prelude::Stream<Item = {ty}> + Send")
+}
+
+fn fallible_stream_for(ty: &str) -> String {
+    stream_for(&format!("trapeze::Result<{ty}>"))
 }
 
 fn replace(src: impl ToString, substitutions: HashMap<&'static str, String>) -> String {
