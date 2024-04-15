@@ -13,10 +13,10 @@ pub use context::metadata::Metadata;
 pub use context::timeout::Timeout;
 pub use context::{get_context, try_get_context, Context};
 pub use server::Server;
-pub use trapeze_codegen as codegen;
 pub use trapeze_macros::*;
 pub use types::protos::{Code, Status};
 
+#[doc(hidden)]
 pub mod __codegen_prelude {
     pub use crate::client::request_handlers::RequestHandler;
     pub use crate::server::method_handlers::MethodHandler;
@@ -26,6 +26,7 @@ pub mod __codegen_prelude {
     };
 }
 
+#[doc(hidden)]
 pub mod prelude {
     pub use std::future::Future;
 
@@ -36,4 +37,9 @@ pub mod prelude {
 
 pub mod stream {
     pub use async_stream::{stream, try_stream};
+    pub use futures::stream::Stream;
+}
+
+pub mod codegen {
+    pub use trapeze_codegen::*;
 }

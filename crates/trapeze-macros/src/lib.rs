@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, Error, LitStr};
+use syn::Error;
 use tempfile::tempdir;
 use trapeze_codegen::Config;
 
@@ -21,28 +21,7 @@ fn env_path(var: &str) -> Result<PathBuf> {
 }
 
 #[proc_macro]
-pub fn include_proto(input: TokenStream) -> TokenStream {
-    let literal: LitStr = parse_macro_input!(input);
-    let file = PathBuf::from(literal.value());
-
-    include_proto_impl(file).unwrap_or_else(|err| {
-        let err = Error::new(literal.span(), err);
-        err.into_compile_error().into()
-    })
-}
-
-fn include_proto_impl(file: impl AsRef<Path>) -> Result<TokenStream> {
-    let dir = file
-        .as_ref()
-        .parent()
-        .context("Expected file to have a parent")?
-        .to_owned();
-    include_protos_impl(&[file], &[dir])
-}
-
-#[proc_macro]
 pub fn include_protos(input: TokenStream) -> TokenStream {
-    //let literal: Punctuated<LitStr, Token![,]> = parse_macro_input!(item);
     let Input {
         files,
         includes,
@@ -62,7 +41,7 @@ fn include_protos_impl(
     files: &[impl AsRef<Path>],
     includes: &[impl AsRef<Path>],
 ) -> Result<TokenStream> {
-    let root = env_path("CARGO_MANIFEST_DIR")?.join("protos");
+    let root = env_path("CARGO_MANIFEST_DIR")?;
     let out_dir = tempdir()?;
 
     let protos: Vec<_> = files.iter().map(|p| root.join(p)).collect();

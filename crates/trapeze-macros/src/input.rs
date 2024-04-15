@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use proc_macro::TokenStream;
@@ -47,8 +48,10 @@ pub fn parse_input(input: TokenStream) -> Result<Input> {
             let includes = files
                 .iter()
                 .map(|p| p.parent().unwrap().to_owned())
+                .collect::<BTreeSet<_>>()
+                .into_iter()
                 .collect();
-            (files.to_vec(), includes)
+            (files, includes)
         }
         [files, includes] => (files.to_vec(), includes.to_vec()),
         [] => {
