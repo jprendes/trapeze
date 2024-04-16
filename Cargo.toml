@@ -26,3 +26,7 @@ trapeze-examples = { path = "crates/trapeze-examples", version = "0.2.0" }
 prost-build = "0.12"
 prost = "0.12"
 tokio = "1"
+
+[profile.release]
+opt-level = 3
+strip = "symbols"
