@@ -117,7 +117,7 @@ impl RequestHandler for Client {
 
         tokio::select! {
             Err(err) = fut => Err(err),
-            Ok(out) = output_rx => Ok(out),
+            Ok(val) = output_rx => Ok(val),
             else => Err(Status::channel_closed()),
         }
     }
@@ -228,7 +228,7 @@ impl RequestHandler for Client {
         tokio::select! {
             Err(err) = input_fut => Err(err),
             Err(err) = fut => Err(err),
-            Ok(out) = output_rx => Ok(out),
+            Ok(val) = output_rx => Ok(val),
             else => Err(Status::channel_closed()),
         }
     }
@@ -301,16 +301,16 @@ async fn handle_client_stream<Input: prost::Message + Default>(
     tx: &StreamSender,
     strm: impl Stream<Item = Input>,
 ) -> Result<()> {
-    tokio::pin!(strm);
-
     struct CloseGuard<'a>(&'a StreamSender);
     impl<'a> Drop for CloseGuard<'a> {
         fn drop(&mut self) {
             self.0.close_data();
         }
     }
+
     let _guard = CloseGuard(tx);
 
+    tokio::pin!(strm);
     while let Some(data) = strm.next().await {
         tx.data(data).await?;
     }
@@ -352,10 +352,10 @@ fn handle_server_stream<'a, Output: prost::Message + Default + 'a>(
 
             let Data { payload } = frame.message.decode::<Data>()?;
 
-            if !frame.flags.contains(Flags::NO_DATA) {
-                let _ = tx.send(payload.decode()?);
-            } else {
+            if frame.flags.contains(Flags::NO_DATA) {
                 payload.ensure_empty()?;
+            } else {
+                let _ = tx.send(payload.decode()?);
             }
 
             if frame.flags.contains(Flags::REMOTE_CLOSED) {

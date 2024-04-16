@@ -12,7 +12,7 @@ mod inline_includes;
 use inline_includes::inline_includes;
 
 mod input;
-use input::{parse_input, Input};
+use input::{parse, Input};
 
 fn env_path(var: &str) -> Result<PathBuf> {
     Ok(PathBuf::from(env::var_os(var).with_context(|| {
@@ -26,7 +26,7 @@ pub fn include_protos(input: TokenStream) -> TokenStream {
         files,
         includes,
         span,
-    } = match parse_input(input) {
+    } = match parse(input) {
         Ok(input) => input,
         Err(err) => return err.to_compile_error().into(),
     };

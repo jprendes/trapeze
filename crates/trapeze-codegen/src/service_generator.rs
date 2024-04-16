@@ -57,7 +57,7 @@ fn make_client_method(mut substitutions: HashMap<&'static str, String>, method: 
 }
 
 fn service_substitutions(service: &Service) -> HashMap<&'static str, String> {
-    let mut substitutions: HashMap<&'static str, String> = Default::default();
+    let mut substitutions = HashMap::default();
     substitutions.insert("service_comments", format_comments(&service.comments, 0));
     substitutions.insert("service_name", service.name.clone());
     substitutions.insert("service_package", service.package.clone());
@@ -67,7 +67,7 @@ fn service_substitutions(service: &Service) -> HashMap<&'static str, String> {
 }
 
 fn method_substitutions(method: &Method) -> HashMap<&'static str, String> {
-    let mut substitutions: HashMap<&'static str, String> = Default::default();
+    let mut substitutions = HashMap::default();
     let Method {
         name,
         proto_name,
@@ -147,8 +147,8 @@ fn fallible_stream_for(ty: &str) -> String {
     stream_for(&format!("trapeze::Result<{ty}>"))
 }
 
-fn replace(src: impl ToString, substitutions: HashMap<&'static str, String>) -> String {
-    let mut src = src.to_string();
+fn replace(src: impl Into<String>, substitutions: HashMap<&'static str, String>) -> String {
+    let mut src = src.into();
     for (from, to) in substitutions {
         src = src.replace(&format!("__{from}__"), &to);
     }

@@ -120,7 +120,7 @@ impl MessageReceiver {
         mut reader: impl AsyncRead + Send + Unpin + 'static,
     ) -> Self {
         let (tx, rx) = unbounded_channel();
-        let streams = Default::default();
+        let streams = IdPool::default();
         let receiver = Self { rx, streams };
         tasks.spawn(async move {
             loop {
@@ -184,7 +184,7 @@ impl MessageIo {
     pub fn stream(&mut self, id: impl Into<Option<u32>>) -> Option<StreamIo> {
         let rx = self.rx.stream(id)?;
         let tx = self.tx.stream(rx.id());
-        Some(StreamIo { rx, tx })
+        Some(StreamIo { tx, rx })
     }
 }
 

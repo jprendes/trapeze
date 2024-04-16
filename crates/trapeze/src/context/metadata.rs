@@ -59,7 +59,7 @@ where
 {
     fn from(metadata: &[T]) -> Self {
         let mut map: HashMap<String, Vec<String>> = HashMap::default();
-        for kv in metadata.iter() {
+        for kv in metadata {
             let KeyValue { key, value } = kv.into();
             match map.get_mut(&key) {
                 Some(v) => {

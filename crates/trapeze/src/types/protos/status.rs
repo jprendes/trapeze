@@ -116,11 +116,11 @@ impl Status {
         Self::not_found(msg)
     }
 
-    pub(crate) fn failed_to_encode(err: EncodeError) -> Self {
+    pub(crate) fn failed_to_encode(err: &EncodeError) -> Self {
         Status::invalid_argument(format!("Error encoding message: {err}"))
     }
 
-    pub(crate) fn failed_to_decode(err: DecodeError) -> Self {
+    pub(crate) fn failed_to_decode(err: &DecodeError) -> Self {
         Status::invalid_argument(format!("Error decoding message: {err}"))
     }
 
@@ -141,13 +141,13 @@ impl Status {
 
 impl From<DecodeError> for Status {
     fn from(value: DecodeError) -> Self {
-        Self::failed_to_decode(value)
+        Self::failed_to_decode(&value)
     }
 }
 
 impl From<EncodeError> for Status {
     fn from(value: EncodeError) -> Self {
-        Self::failed_to_encode(value)
+        Self::failed_to_encode(&value)
     }
 }
 

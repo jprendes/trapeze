@@ -24,7 +24,7 @@ impl Buf for RawBytes {
     }
 
     fn advance(&mut self, cnt: usize) {
-        self.0.advance(cnt)
+        self.0.advance(cnt);
     }
 }
 
@@ -42,13 +42,13 @@ pub trait ProstField: Send + Sync + Debug {
 
 impl<T: prost::Message> ProstField for T {
     fn encode(&self, tag: u32, buf: &mut impl BufMut) {
-        prost::encoding::message::encode(tag, self, buf)
+        prost::encoding::message::encode(tag, self, buf);
     }
     fn encoded_len(&self, tag: u32) -> usize {
         prost::encoding::message::encoded_len(tag, self)
     }
     fn clear(&mut self) {
-        prost::Message::clear(self)
+        prost::Message::clear(self);
     }
     fn merge(
         &mut self,
@@ -62,13 +62,13 @@ impl<T: prost::Message> ProstField for T {
 
 impl ProstField for RawBytes {
     fn encode(&self, tag: u32, buf: &mut impl BufMut) {
-        prost::encoding::bytes::encode(tag, &self.0, buf)
+        prost::encoding::bytes::encode(tag, &self.0, buf);
     }
     fn encoded_len(&self, tag: u32) -> usize {
         prost::encoding::bytes::encoded_len(tag, &self.0)
     }
     fn clear(&mut self) {
-        prost::Message::clear(&mut self.0)
+        prost::Message::clear(&mut self.0);
     }
     fn merge(
         &mut self,

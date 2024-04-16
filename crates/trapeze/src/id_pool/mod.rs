@@ -30,8 +30,8 @@ impl<T: Send + Sync> Default for IdPool<T> {
     fn default() -> Self {
         let (tx, rx) = unbounded();
         Self {
-            used: Default::default(),
-            free: Default::default(),
+            used: BTreeMap::default(),
+            free: OddRangePool::default(),
             tx,
             rx,
         }

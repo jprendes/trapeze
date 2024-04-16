@@ -18,12 +18,14 @@ tokio::task_local! {
     static CONTEXT: Arc<Context>;
 }
 
+#[must_use]
 pub fn get_context() -> Arc<Context> {
-    CONTEXT.with(|c| c.clone())
+    CONTEXT.with(Clone::clone)
 }
 
+#[must_use]
 pub fn try_get_context() -> Option<Arc<Context>> {
-    CONTEXT.try_with(|c| c.clone()).ok()
+    CONTEXT.try_with(Clone::clone).ok()
 }
 
 pub trait WithContext: Future {

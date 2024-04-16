@@ -43,29 +43,37 @@ pub struct MethodNotFound<S: Display + Send, M: Display + Send> {
 
 impl<Input, Output, F> UnaryMethod<Input, Output, F> {
     pub fn new(f: F) -> Self {
-        let _phantom = Default::default();
-        Self { f, _phantom }
+        Self {
+            f,
+            _phantom: PhantomData,
+        }
     }
 }
 
 impl<Input, Output, F> ServerStreamingMethod<Input, Output, F> {
     pub fn new(f: F) -> Self {
-        let _phantom = Default::default();
-        Self { f, _phantom }
+        Self {
+            f,
+            _phantom: PhantomData,
+        }
     }
 }
 
 impl<Input, Output, F> ClientStreamingMethod<Input, Output, F> {
     pub fn new(f: F) -> Self {
-        let _phantom = Default::default();
-        Self { f, _phantom }
+        Self {
+            f,
+            _phantom: PhantomData,
+        }
     }
 }
 
 impl<Input, Output, F> DuplexStreamingMethod<Input, Output, F> {
     pub fn new(f: F) -> Self {
-        let _phantom = Default::default();
-        Self { f, _phantom }
+        Self {
+            f,
+            _phantom: PhantomData,
+        }
     }
 }
 

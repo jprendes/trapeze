@@ -246,10 +246,10 @@ fn handle_client_stream<'a, Input: prost::Message + Default + 'a>(
         while let Some(frame) = rx.recv().await {
             let Data { payload } = frame.message.decode::<Data>()?;
 
-            if !frame.flags.contains(Flags::NO_DATA) {
-                let _ = tx.send(payload.decode()?);
-            } else {
+            if frame.flags.contains(Flags::NO_DATA) {
                 payload.ensure_empty()?;
+            } else {
+                let _ = tx.send(payload.decode()?);
             }
 
             if frame.flags.contains(Flags::REMOTE_CLOSED) {

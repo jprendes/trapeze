@@ -37,7 +37,7 @@ pub struct Input {
     pub span: Span,
 }
 
-pub fn parse_input(input: TokenStream) -> Result<Input> {
+pub fn parse(input: TokenStream) -> Result<Input> {
     let input: proc_macro2::TokenStream = input.into();
     let span = input.span();
     let files: Punctuated<BracketedList, Token![,]> = parse_quote! { #input };
@@ -54,12 +54,6 @@ pub fn parse_input(input: TokenStream) -> Result<Input> {
             (files, includes)
         }
         [files, includes] => (files.to_vec(), includes.to_vec()),
-        [] => {
-            return Err(Error::new(
-                input.span(),
-                "Expected a list of files to compile",
-            ));
-        }
         _ => {
             return Err(Error::new(
                 input.span(),

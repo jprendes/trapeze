@@ -64,8 +64,9 @@ pub struct Config(prost_build::Config);
 
 impl Config {
     /// Creates a new code generator configuration with default options.
+    #[must_use]
     pub fn new() -> Self {
-        Default::default()
+        Self::default()
     }
 }
 
