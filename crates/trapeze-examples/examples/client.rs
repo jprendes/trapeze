@@ -1,7 +1,6 @@
 use std::time::{Duration, Instant};
 
 use futures::TryStreamExt;
-use tokio::net::UnixStream;
 use tokio::time::sleep;
 use trapeze::stream::stream;
 use trapeze::Client;
@@ -208,9 +207,8 @@ async fn streaming_echo_default_value(client: Client, start: Instant) {
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    let conn = UnixStream::connect(ADDRESS).await.unwrap();
-
-    let client = Client::new(conn).with_metadata([
+    let client = Client::connect(ADDRESS).await.unwrap();
+    let client = client.with_metadata([
         ("key-1", "value-1-1"),
         ("key-1", "value-1-2"),
         ("key-2", "value-2"),

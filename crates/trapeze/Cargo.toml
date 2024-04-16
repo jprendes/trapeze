@@ -21,3 +21,6 @@ async-stream = "0.3"
 tokio-stream = "0.1"
 async-trait = "0.1"
 log = "0.4"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = "0.52"

@@ -12,6 +12,7 @@ use crate::context::metadata::Metadata;
 use crate::context::timeout::Timeout;
 use crate::context::Context;
 use crate::io::{MessageIo, StreamIo};
+use crate::transport::connect;
 use crate::{Result, Status};
 
 pub mod request_handlers;
@@ -31,6 +32,7 @@ struct ClientInner {
 }
 
 impl Client {
+    #[must_use]
     pub fn with_metadata(&self, metadata: impl Into<Metadata>) -> Self {
         Self {
             tx: self.tx.clone(),
@@ -42,6 +44,7 @@ impl Client {
         }
     }
 
+    #[must_use]
     pub fn with_timeout(&self, timeout: impl Into<Timeout>) -> Self {
         Self {
             tx: self.tx.clone(),
@@ -53,6 +56,7 @@ impl Client {
         }
     }
 
+    #[must_use]
     pub fn with_context(&self, context: impl Into<Context>) -> Self {
         Self {
             tx: self.tx.clone(),
@@ -101,7 +105,7 @@ impl Client {
     pub fn new<C: AsyncRead + AsyncWrite + Send + 'static>(connection: C) -> Self {
         let (tx, rx) = unbounded_channel();
         let mut tasks = JoinSet::<IoResult<()>>::new();
-        let context = Default::default();
+        let context = Context::default();
 
         let mut inner = ClientInner::new(connection);
         tasks.spawn(async move { inner.start(rx).await });
@@ -109,6 +113,11 @@ impl Client {
         let tasks = Arc::new(tasks);
 
         Self { tx, tasks, context }
+    }
+
+    pub async fn connect(address: impl AsRef<str>) -> IoResult<Self> {
+        let conn = connect(address).await?;
+        Ok(Self::new(conn))
     }
 
     fn spawn_stream<Fut: Future<Output = Result<()>> + Send>(

@@ -1,6 +1,5 @@
 use futures::stream::StreamExt as _;
 use tokio::fs::remove_file;
-use tokio::net::UnixListener;
 use tokio::pin;
 use tokio::signal::ctrl_c;
 use tokio::time::sleep;
@@ -155,27 +154,28 @@ impl Streaming for StreamingProvider {
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     let _ = remove_file(ADDRESS).await;
-    let listener = UnixListener::bind(ADDRESS).unwrap();
 
-    tokio::spawn(async move {
-        loop {
-            if let Ok((conn, _)) = listener.accept().await {
-                tokio::spawn(async move {
-                    Server::new(conn)
-                        .add_service(AgentProvider::service())
-                        .add_service(HealthProvider::service())
-                        .add_service(StreamingProvider::service())
-                        .start()
-                        .await
-                });
-            }
-        }
-    });
+    let server = async move {
+        Server::new()
+            .add_service(AgentProvider::service())
+            .add_service(HealthProvider::service())
+            .add_service(StreamingProvider::service())
+            .bind(ADDRESS)
+            .await
+            .expect("Server error");
+    };
+
+    let ctrl_c = async move {
+        ctrl_c().await.expect("Failed to wait for Ctrl+C.");
+    };
 
     println!("Listening on {ADDRESS}");
     println!("Press Ctrl+C to exit.");
 
-    ctrl_c().await.expect("Failed to wait for Ctrl+C.");
+    tokio::select! {
+        _ = server => {},
+        _ = ctrl_c => {},
+    };
 
     let _ = remove_file(ADDRESS).await;
 }

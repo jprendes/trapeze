@@ -4,6 +4,7 @@ mod id_pool;
 mod io;
 mod server;
 mod service;
+mod transport;
 mod types;
 
 pub type Result<T, E = Status> = std::result::Result<T, E>;
@@ -12,7 +13,7 @@ pub use client::Client;
 pub use context::metadata::Metadata;
 pub use context::timeout::Timeout;
 pub use context::{get_context, try_get_context, Context};
-pub use server::Server;
+pub use server::{Server, ServerConnection};
 pub use trapeze_macros::*;
 pub use types::protos::{Code, Status};
 
