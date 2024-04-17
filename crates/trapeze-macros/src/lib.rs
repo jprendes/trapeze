@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::Error;
+use syn::{parse_macro_input, Error};
 use tempfile::tempdir;
 use trapeze_codegen::Config;
 
@@ -60,4 +60,33 @@ fn include_protos_impl(
     };
 
     Ok(tokens.into())
+}
+
+#[proc_macro_attribute]
+pub fn service(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let item = item.clone();
+    let trait_name = parse_macro_input!(attr as syn::Path);
+    let item_parsed = parse_macro_input!(item as syn::DeriveInput);
+
+    let name = item_parsed.ident.clone();
+    let (impl_generics, ty_generics, where_clause) = item_parsed.generics.split_for_impl();
+
+    let tokens = quote! {
+        #item_parsed
+
+        impl #impl_generics trapeze::__codegen_prelude::Service for #name #ty_generics #where_clause {
+            fn name(&self) -> &'static str {
+                #trait_name::<Self>().0
+            }
+
+            fn dispatch(
+                &self,
+                method: std::string::String,
+            ) -> std::boxed::Box<dyn trapeze::__codegen_prelude::MethodHandler + Send + '_> {
+                #trait_name::<Self>().1(self, method)
+            }
+        }
+    };
+    
+    tokens.into()
 }

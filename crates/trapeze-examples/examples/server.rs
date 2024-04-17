@@ -5,7 +5,7 @@ use tokio::signal::ctrl_c;
 use tokio::time::sleep;
 use trapeze::prelude::Stream;
 use trapeze::stream::try_stream;
-use trapeze::{get_context, Code, Result, Server, Status};
+use trapeze::{get_context, service, Code, Result, Server, Status};
 
 mod common;
 
@@ -15,6 +15,7 @@ use streaming::*;
 use types::*;
 
 #[derive(Clone, Default)]
+#[service(Health)]
 struct HealthProvider;
 impl Health for HealthProvider {
     async fn check(&self, _req: CheckRequest) -> Result<HealthCheckResponse> {
@@ -33,6 +34,7 @@ impl Health for HealthProvider {
 }
 
 #[derive(Clone, Default)]
+#[service(AgentService)]
 struct AgentProvider;
 impl AgentService for AgentProvider {
     async fn list_interfaces(&self, _req: ListInterfacesRequest) -> Result<Interfaces> {
@@ -53,6 +55,7 @@ impl AgentService for AgentProvider {
 }
 
 #[derive(Clone, Default)]
+#[service(Streaming)]
 struct StreamingProvider;
 impl Streaming for StreamingProvider {
     async fn echo(&self, mut echo_payload: EchoPayload) -> trapeze::Result<EchoPayload> {
@@ -157,9 +160,9 @@ async fn main() {
 
     let server = async move {
         Server::new()
-            .add_service(AgentProvider::service())
-            .add_service(HealthProvider::service())
-            .add_service(StreamingProvider::service())
+            .add_service(AgentProvider)
+            .add_service(HealthProvider)
+            .add_service(StreamingProvider)
             .bind(ADDRESS)
             .await
             .expect("Server error");
