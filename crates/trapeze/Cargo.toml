@@ -24,3 +24,10 @@ log = "0.4"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = "0.52"
+
+[target.'cfg(unix)'.dependencies]
+tokio-vsock = { version = "0.5", optional = true }
+
+[features]
+default = [ "vsock" ]
+vsock = [ "dep:tokio-vsock" ]

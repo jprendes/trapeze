@@ -1,44 +1,47 @@
+use std::future::poll_fn;
 use std::io::Result as IoResult;
-use std::os::unix::net::{SocketAddr, UnixListener as StdUnixListener, UnixStream as StdUnixStream};
+use std::os::unix::net::{
+    SocketAddr, UnixListener as StdUnixListener, UnixStream as StdUnixStream,
+};
 
 use async_trait::async_trait;
-use tokio::net::{UnixListener as TokioUnixListener, UnixStream as TokioUnixStream};
+use tokio::net::{UnixListener, UnixStream};
 
-use super::{Connection, Listener};
-
-pub struct UnixListener {
-    inner: TokioUnixListener,
+pub struct Listener {
+    inner: UnixListener,
     addr: String,
 }
 
 #[async_trait]
-impl Listener for UnixListener {
-    async fn accept(&mut self) -> IoResult<Box<dyn Connection>> {
+impl super::Listener for Listener {
+    async fn accept(&mut self) -> IoResult<Box<dyn super::Connection>> {
         let (conn, _) = self.inner.accept().await?;
         Ok(Box::new(conn))
     }
 }
 
-pub fn bind(addr: impl AsRef<str>) -> IoResult<UnixListener> {
+pub fn bind(addr: impl AsRef<str>) -> IoResult<Listener> {
     let addr: String = addr.as_ref().into();
     let inner = {
         let addr = make_socket_addr(&addr)?;
         let inner = StdUnixListener::bind_addr(&addr)?;
         inner.set_nonblocking(true)?;
-        TokioUnixListener::from_std(inner)?
+        UnixListener::from_std(inner)?
     };
 
-    Ok(UnixListener { inner, addr })
+    Ok(Listener { inner, addr })
 }
 
-pub async fn connect(addr: impl AsRef<str>) -> IoResult<TokioUnixStream> {
+pub async fn connect(addr: impl AsRef<str>) -> IoResult<UnixStream> {
     let addr = make_socket_addr(addr.as_ref())?;
     let inner = StdUnixStream::connect_addr(&addr)?;
     inner.set_nonblocking(true)?;
-    TokioUnixStream::from_std(inner)
+    let inner = UnixStream::from_std(inner)?;
+    poll_fn(|cx| inner.poll_write_ready(cx)).await?;
+    Ok(inner)
 }
 
-impl Drop for UnixListener {
+impl Drop for Listener {
     fn drop(&mut self) {
         cleanup_socket(&self.addr);
     }
