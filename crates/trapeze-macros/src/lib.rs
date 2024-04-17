@@ -87,6 +87,6 @@ pub fn service(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
         }
     };
-    
+
     tokens.into()
 }

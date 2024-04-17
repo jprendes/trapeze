@@ -15,7 +15,7 @@ impl super::Listener for Listener {
     }
 }
 
-pub async fn bind(addr: impl AsRef<str>) -> IoResult<Listener> {
+pub fn bind(addr: impl AsRef<str>) -> IoResult<Listener> {
     let addr = parse_vsock_addr(addr)?;
     let inner = VsockListener::bind(addr)?;
     Ok(Listener { inner })

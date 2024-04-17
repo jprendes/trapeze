@@ -40,7 +40,7 @@ pub async fn bind(addr: impl AsRef<str>) -> IoResult<Box<dyn Listener + Send>> {
 
     #[cfg(all(unix, feature = "vsock"))]
     if let Some(addr) = addr.strip_prefix("vsock://") {
-        return Ok(Box::new(vsock::bind(addr).await?));
+        return Ok(Box::new(vsock::bind(addr)?));
     }
 
     #[cfg(unix)]
