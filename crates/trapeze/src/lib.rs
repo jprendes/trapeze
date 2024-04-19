@@ -22,7 +22,8 @@ pub mod __codegen_prelude {
     pub use crate::client::request_handlers::RequestHandler;
     pub use crate::server::method_handlers::MethodHandler;
     pub use crate::service::{
-        ClientStreamingMethod, DuplexStreamingMethod, ServerStreamingMethod, Service, UnaryMethod,
+        ClientStreamingMethod, DuplexStreamingMethod, ServerStreamingMethod, Service,
+        Sealed, UnaryMethod,
     };
 }
 

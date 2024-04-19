@@ -6,7 +6,7 @@ pub fn __service_name__<T: __service_name__>(target: std::sync::Arc<T>) -> std::
 }
 
 __service_comments__
-pub trait __service_name__: Send + Sync + 'static {
+pub trait __service_name__: trapeze::__codegen_prelude::Sealed + Send + Sync + 'static {
     __trait_methods__
 }
 
