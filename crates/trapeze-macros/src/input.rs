@@ -6,16 +6,35 @@ use proc_macro2::Span;
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
+use syn::token::Token;
 use syn::{bracketed, parse_quote, Error, LitStr, Result, Token};
 
+pub struct PunctuatedList<T, Tok: Token = Token![,]> {
+    values: Punctuated<T, Tok>,
+}
+
+impl<T: Clone, Tok: Token> PunctuatedList<T, Tok> {
+    pub fn to_vec(&self) -> Vec<T> {
+        self.values.iter().cloned().collect()
+    }
+}
+
+impl<T: Parse, Tok: Token + Parse> Parse for PunctuatedList<T, Tok> {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(PunctuatedList {
+            values: Punctuated::<T, Tok>::parse_terminated(input)?,
+        })
+    }
+}
 struct BracketedList {
-    values: Punctuated<LitStr, Token![,]>,
+    values: PunctuatedList<LitStr>,
 }
 
 impl BracketedList {
     fn to_vec(&self) -> Vec<PathBuf> {
         self.values
-            .iter()
+            .to_vec()
+            .into_iter()
             .map(|f| PathBuf::from(f.value()))
             .collect()
     }
@@ -25,9 +44,8 @@ impl Parse for BracketedList {
     fn parse(input: ParseStream) -> Result<Self> {
         let content;
         let _ = bracketed!(content in input);
-        Ok(BracketedList {
-            values: Punctuated::<LitStr, Token![,]>::parse_terminated(&content)?,
-        })
+        let values = PunctuatedList::parse(&content)?;
+        Ok(BracketedList { values })
     }
 }
 

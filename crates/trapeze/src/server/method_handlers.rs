@@ -1,4 +1,3 @@
-use std::fmt::Display;
 use std::future::Future;
 
 use async_trait::async_trait;
@@ -13,8 +12,7 @@ use crate::context::get_context;
 use crate::context::timeout::Timeout;
 use crate::io::{StreamIo, StreamReceiver, StreamSender};
 use crate::service::{
-    ClientStreamingMethod, DuplexStreamingMethod, MethodNotFound, ServerStreamingMethod,
-    UnaryMethod,
+    ClientStreamingMethod, DuplexStreamingMethod, ServerStreamingMethod, UnaryMethod,
 };
 use crate::types::encoding::BufExt;
 use crate::types::flags::Flags;
@@ -24,24 +22,7 @@ use crate::Result;
 
 #[async_trait]
 pub trait MethodHandler {
-    async fn handle(
-        self: Box<Self>,
-        flags: Flags,
-        payload: RawBytes,
-        stream: &mut StreamIo,
-    ) -> Result<()>;
-}
-
-#[async_trait]
-impl<S: Display + Send, M: Display + Send> MethodHandler for MethodNotFound<S, M> {
-    async fn handle(
-        self: Box<Self>,
-        _flags: Flags,
-        _payload: RawBytes,
-        _stream: &mut StreamIo,
-    ) -> Result<()> {
-        Err(Status::method_not_found(&self.service, &self.method))
-    }
+    async fn handle(&self, flags: Flags, payload: RawBytes, stream: &mut StreamIo) -> Result<()>;
 }
 
 macro_rules! try_join_all {
@@ -58,19 +39,13 @@ macro_rules! join_first {
 
 #[async_trait]
 impl<
-        'a,
-        Input: prost::Message + Default + 'a,
-        Output: prost::Message + Default + 'a,
-        FutOut: Future<Output = Result<Output>> + Send + 'a,
-        F: FnOnce(Input) -> FutOut + Send + 'a,
-    > MethodHandler for UnaryMethod<Input, FutOut, F>
+        Input: prost::Message + Default,
+        Output: prost::Message + Default,
+        FutOut: Future<Output = Result<Output>> + Send,
+        F: Fn(Input) -> FutOut + Send + Sync,
+    > MethodHandler for UnaryMethod<Input, Output, F>
 {
-    async fn handle(
-        self: Box<Self>,
-        flags: Flags,
-        payload: RawBytes,
-        stream: &mut StreamIo,
-    ) -> Result<()> {
+    async fn handle(&self, flags: Flags, payload: RawBytes, stream: &mut StreamIo) -> Result<()> {
         if !flags.is_empty() {
             // Unary methos should have empty flags
             return Err(Status::invalid_request_flags(Flags::empty(), flags));
@@ -80,7 +55,7 @@ impl<
 
         let payload: Input = payload.decode()?;
 
-        let fut = (self.f)(payload);
+        let fut = (self.method)(payload);
 
         let output = handle_server_unary(&stream.tx, fut);
         let monitor = monitor_client_stream(&rx);
@@ -101,15 +76,10 @@ impl<
         Input: prost::Message + Default,
         Output: prost::Message + Default,
         StrmOut: Stream<Item = Result<Output>> + Send,
-        F: FnOnce(Input) -> StrmOut + Send,
-    > MethodHandler for ServerStreamingMethod<Input, StrmOut, F>
+        F: Fn(Input) -> StrmOut + Send + Sync,
+    > MethodHandler for ServerStreamingMethod<Input, Output, F>
 {
-    async fn handle(
-        self: Box<Self>,
-        flags: Flags,
-        payload: RawBytes,
-        stream: &mut StreamIo,
-    ) -> Result<()> {
+    async fn handle(&self, flags: Flags, payload: RawBytes, stream: &mut StreamIo) -> Result<()> {
         let rx = RwLock::new(&mut stream.rx);
 
         if flags.bits() != Flags::REMOTE_CLOSED.bits() {
@@ -120,7 +90,7 @@ impl<
 
         let payload: Input = payload.decode()?;
 
-        let output_strm = (self.f)(payload);
+        let output_strm = (self.method)(payload);
 
         let output = handle_server_stream(&stream.tx, output_strm);
         let monitor = monitor_client_stream(&rx);
@@ -141,15 +111,10 @@ impl<
         Input: prost::Message + Default,
         Output: prost::Message + Default,
         FutOut: Future<Output = Result<Output>> + Send,
-        F: FnOnce(UnboundedReceiverStream<Input>) -> FutOut + Send,
-    > MethodHandler for ClientStreamingMethod<UnboundedReceiverStream<Input>, FutOut, F>
+        F: Fn(UnboundedReceiverStream<Input>) -> FutOut + Send + Sync,
+    > MethodHandler for ClientStreamingMethod<Input, Output, F>
 {
-    async fn handle(
-        self: Box<Self>,
-        flags: Flags,
-        payload: RawBytes,
-        stream: &mut StreamIo,
-    ) -> Result<()> {
+    async fn handle(&self, flags: Flags, payload: RawBytes, stream: &mut StreamIo) -> Result<()> {
         let rx = RwLock::new(&mut stream.rx);
 
         if flags.bits() != (Flags::REMOTE_OPEN | Flags::NO_DATA).bits() {
@@ -165,7 +130,7 @@ impl<
 
         let (input_tx, input_strm) = make_input_stream();
 
-        let output_fut = (self.f)(input_strm);
+        let output_fut = (self.method)(input_strm);
 
         let output = handle_server_unary(&stream.tx, output_fut);
         let input = handle_client_stream(&rx, input_tx);
@@ -188,15 +153,10 @@ impl<
         Input: prost::Message + Default,
         Output: prost::Message + Default,
         StrmOut: Stream<Item = Result<Output>> + Send,
-        F: FnOnce(UnboundedReceiverStream<Input>) -> StrmOut + Send,
-    > MethodHandler for DuplexStreamingMethod<UnboundedReceiverStream<Input>, StrmOut, F>
+        F: Fn(UnboundedReceiverStream<Input>) -> StrmOut + Send + Sync,
+    > MethodHandler for DuplexStreamingMethod<Input, Output, F>
 {
-    async fn handle(
-        self: Box<Self>,
-        flags: Flags,
-        payload: RawBytes,
-        stream: &mut StreamIo,
-    ) -> Result<()> {
+    async fn handle(&self, flags: Flags, payload: RawBytes, stream: &mut StreamIo) -> Result<()> {
         let rx = RwLock::new(&mut stream.rx);
 
         if flags.bits() != (Flags::REMOTE_OPEN | Flags::NO_DATA).bits() {
@@ -212,7 +172,7 @@ impl<
 
         let (input_tx, input_strm) = make_input_stream();
 
-        let output_strm = (self.f)(input_strm);
+        let output_strm = (self.method)(input_strm);
 
         let output = handle_server_stream(&stream.tx, output_strm);
         let input = handle_client_stream(&rx, input_tx);

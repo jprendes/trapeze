@@ -15,9 +15,10 @@ use streaming::*;
 use types::*;
 
 #[derive(Clone, Default)]
-#[service(Health)]
-struct HealthProvider;
-impl Health for HealthProvider {
+#[service(Health, AgentService, Streaming)]
+struct Services;
+
+impl Health for Services {
     async fn check(&self, _req: CheckRequest) -> Result<HealthCheckResponse> {
         println!("> check() - {:?}", get_context());
         sleep(std::time::Duration::from_secs(10)).await;
@@ -33,10 +34,7 @@ impl Health for HealthProvider {
     }
 }
 
-#[derive(Clone, Default)]
-#[service(AgentService)]
-struct AgentProvider;
-impl AgentService for AgentProvider {
+impl AgentService for Services {
     async fn list_interfaces(&self, _req: ListInterfacesRequest) -> Result<Interfaces> {
         println!("> list_interfaces() - {:?}", get_context());
         Ok(Interfaces {
@@ -54,10 +52,7 @@ impl AgentService for AgentProvider {
     }
 }
 
-#[derive(Clone, Default)]
-#[service(Streaming)]
-struct StreamingProvider;
-impl Streaming for StreamingProvider {
+impl Streaming for Services {
     async fn echo(&self, mut echo_payload: EchoPayload) -> trapeze::Result<EchoPayload> {
         println!("> echo() - {:?}", get_context());
         echo_payload.seq += 1;
@@ -160,9 +155,7 @@ async fn main() {
 
     let server = async move {
         Server::new()
-            .add_service(AgentProvider)
-            .add_service(HealthProvider)
-            .add_service(StreamingProvider)
+            .add_service(Services)
             .bind(ADDRESS)
             .await
             .expect("Server error");
@@ -179,6 +172,4 @@ async fn main() {
         _ = server => {},
         _ = ctrl_c => {},
     };
-
-    let _ = remove_file(ADDRESS).await;
 }

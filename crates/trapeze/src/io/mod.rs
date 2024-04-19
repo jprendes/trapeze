@@ -160,9 +160,7 @@ impl MessageReceiver {
 
     fn stream(&mut self, id: impl Into<Option<u32>>) -> Option<StreamReceiver> {
         let (tx, rx) = unbounded_channel();
-        let Some(guard) = self.streams.claim(id, tx) else {
-            return None;
-        };
+        let guard = self.streams.claim(id, tx)?;
         let guard = Arc::new(guard);
         Some(StreamReceiver { rx, guard })
     }

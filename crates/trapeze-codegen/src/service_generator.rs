@@ -95,12 +95,6 @@ fn method_substitutions(method: &Method) -> HashMap<&'static str, String> {
         (true, true) => "handle_duplex_streaming_request",
     };
 
-    let into_method_output = if *server_streaming {
-        format!("into_stream::<{output_type}>")
-    } else {
-        format!("into_future::<{output_type}>")
-    };
-
     let input_type = if *client_streaming {
         stream_for(input_type)
     } else {
@@ -113,6 +107,18 @@ fn method_substitutions(method: &Method) -> HashMap<&'static str, String> {
         fallible_future_for(output_type)
     };
 
+    let output_handler = if *server_streaming {
+        stream_handler(name)
+    } else {
+        future_handler(name)
+    };
+
+    let not_found = if *server_streaming {
+        not_found_stream()
+    } else {
+        not_found_future()
+    };
+
     substitutions.insert("method_comments", format_comments(comments, 1));
     substitutions.insert("method_name", name.clone());
     substitutions.insert("method_proto_name", proto_name.clone());
@@ -121,7 +127,8 @@ fn method_substitutions(method: &Method) -> HashMap<&'static str, String> {
     substitutions.insert("method_output_type", output_type);
     substitutions.insert("method_wrapper", wrapper.to_string());
     substitutions.insert("method_request_handler", request_handler.to_string());
-    substitutions.insert("into_method_output", into_method_output);
+    substitutions.insert("method_output_handler", output_handler);
+    substitutions.insert("method_not_found", not_found);
     substitutions
 }
 
@@ -153,6 +160,22 @@ fn replace(src: impl Into<String>, substitutions: HashMap<&'static str, String>)
         src = src.replace(&format!("__{from}__"), &to);
     }
     src
+}
+
+fn future_handler(method_name: &str) -> String {
+    format!("async move {{ target.{method_name}(input).await }}")
+}
+
+fn stream_handler(method_name: &str) -> String {
+    format!("trapeze::stream::stream! {{ for await value in target.{method_name}(input) {{ yield value; }} }}")
+}
+
+fn not_found_future() -> String {
+    "async move { Err(not_found) }".into()
+}
+
+fn not_found_stream() -> String {
+    "trapeze::stream::stream! { yield Err(not_found); }".into()
 }
 
 fn camel2snake(name: impl AsRef<str>) -> String {

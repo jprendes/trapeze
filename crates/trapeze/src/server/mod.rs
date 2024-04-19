@@ -9,6 +9,7 @@ use tokio::task::JoinSet;
 use crate::context::timeout::Timeout;
 use crate::context::{Context, WithContext};
 use crate::io::MessageIo;
+use crate::server::method_handlers::MethodHandler;
 use crate::service::Service;
 use crate::transport::{bind, Listener};
 use crate::types::frame::StreamFrame;
@@ -18,7 +19,7 @@ pub mod method_handlers;
 
 #[derive(Default)]
 pub struct Server {
-    services: HashMap<&'static str, Arc<dyn Service>>,
+    methods: HashMap<&'static str, Arc<dyn MethodHandler + Send + Sync>>,
     tasks: JoinSet<IoResult<()>>,
 }
 
@@ -28,8 +29,9 @@ impl Server {
         Self::default()
     }
 
-    pub fn add_service(&mut self, service: impl Service + 'static) -> &mut Self {
-        self.services.insert(service.name(), Arc::new(service));
+    pub fn add_service(&mut self, service: impl Service) -> &mut Self {
+        let service = Arc::new(service);
+        self.methods.extend(service.methods());
         self
     }
 
@@ -53,9 +55,9 @@ impl Server {
                     let Ok(conn) = conn else {
                         continue;
                     };
-                    let services = self.services.clone();
+                    let methods = self.methods.clone();
                     self.tasks.spawn(async move {
-                        ServerConnection::new_with_services(conn, services)
+                        ServerConnection::new_with_methods(conn, methods)
                             .start()
                             .await
                     });
@@ -70,31 +72,41 @@ impl Server {
 
 pub struct ServerConnection {
     io: MessageIo,
-    services: HashMap<&'static str, Arc<dyn Service>>,
+    methods: HashMap<&'static str, Arc<dyn MethodHandler + Send + Sync>>,
     tasks: JoinSet<IoResult<()>>,
 }
 
 impl ServerConnection {
     pub fn new<C: AsyncRead + AsyncWrite + Send + 'static>(connection: C) -> ServerConnection {
-        Self::new_with_services(connection, HashMap::default())
+        Self::new_with_services(connection, [])
     }
 
     pub fn new_with_services<C: AsyncRead + AsyncWrite + Send + 'static>(
         connection: C,
-        services: HashMap<&'static str, Arc<dyn Service>>,
+        services: impl IntoIterator<Item = Arc<dyn Service>>,
+    ) -> ServerConnection {
+        let mut methods = HashMap::default();
+        for service in services {
+            methods.extend(service.methods().into_iter());
+        }
+
+        Self::new_with_methods(connection, methods)
+    }
+
+    fn new_with_methods<C: AsyncRead + AsyncWrite + Send + 'static>(
+        connection: C,
+        methods: impl Into<HashMap<&'static str, Arc<dyn MethodHandler + Send + Sync>>>,
     ) -> ServerConnection {
         let mut tasks = JoinSet::<IoResult<()>>::new();
         let io = MessageIo::new(&mut tasks, connection);
+        let methods = methods.into();
 
-        ServerConnection {
-            io,
-            services,
-            tasks,
-        }
+        ServerConnection { io, methods, tasks }
     }
 
-    pub fn add_service(&mut self, service: impl Service + 'static) -> &mut Self {
-        self.services.insert(service.name(), Arc::new(service));
+    pub fn add_service(&mut self, service: impl Service) -> &mut Self {
+        let service = Arc::new(service);
+        self.methods.extend(service.methods());
         self
     }
 
@@ -152,14 +164,15 @@ impl ServerConnection {
             timeout: Timeout::from_nanos(timeout_nano),
         };
 
-        let Some(service) = self.services.get(service.as_str()).cloned() else {
+        let path = format!("/{service}/{method}");
+
+        let Some(method) = self.methods.get(path.as_str()).cloned() else {
             stream.tx.error(Status::method_not_found(service, method));
             return;
         };
 
         self.tasks.spawn(
             async move {
-                let method = service.dispatch(method);
                 if let Err(status) = method.handle(flags, payload, &mut stream).await {
                     stream.tx.error(status);
                 }

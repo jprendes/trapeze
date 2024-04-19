@@ -12,7 +12,7 @@ mod inline_includes;
 use inline_includes::inline_includes;
 
 mod input;
-use input::{parse, Input};
+use input::{parse, Input, PunctuatedList};
 
 fn env_path(var: &str) -> Result<PathBuf> {
     Ok(PathBuf::from(env::var_os(var).with_context(|| {
@@ -65,7 +65,7 @@ fn include_protos_impl(
 #[proc_macro_attribute]
 pub fn service(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item = item.clone();
-    let trait_name = parse_macro_input!(attr as syn::Path);
+    let trait_names = parse_macro_input!(attr as PunctuatedList<syn::Path>).to_vec();
     let item_parsed = parse_macro_input!(item as syn::DeriveInput);
 
     let name = item_parsed.ident.clone();
@@ -75,15 +75,8 @@ pub fn service(attr: TokenStream, item: TokenStream) -> TokenStream {
         #item_parsed
 
         impl #impl_generics trapeze::__codegen_prelude::Service for #name #ty_generics #where_clause {
-            fn name(&self) -> &'static str {
-                #trait_name::<Self>().0
-            }
-
-            fn dispatch(
-                &self,
-                method: std::string::String,
-            ) -> std::boxed::Box<dyn trapeze::__codegen_prelude::MethodHandler + Send + '_> {
-                #trait_name::<Self>().1(self, method)
+            fn methods(self: std::sync::Arc<Self>) -> std::vec::Vec<(&'static str, std::sync::Arc<dyn trapeze::__codegen_prelude::MethodHandler + Send + Sync>)> {
+                [#(#trait_names(self.clone()),)*].into_iter().flatten().collect()
             }
         }
     };
