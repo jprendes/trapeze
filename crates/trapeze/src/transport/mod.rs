@@ -20,22 +20,22 @@ pub trait Connection: AsyncRead + AsyncWrite + Send + Unpin + 'static {}
 impl<T: AsyncRead + AsyncWrite + Send + Unpin + 'static> Connection for T {}
 
 #[async_trait]
-pub trait Listener: 'static {
+pub trait Listener: Send + 'static {
     async fn accept(&mut self) -> IoResult<Box<dyn Connection>>;
 }
 
 #[async_trait]
-impl Listener for Box<dyn Listener + Send> {
+impl Listener for Box<dyn Listener> {
     async fn accept(&mut self) -> IoResult<Box<dyn Connection>> {
         self.deref_mut().accept().await
     }
 }
 
-pub async fn bind(addr: impl AsRef<str>) -> IoResult<Box<dyn Listener + Send>> {
+pub async fn bind(addr: impl AsRef<str>) -> IoResult<impl Listener> {
     let addr = addr.as_ref();
 
     if let Some(addr) = addr.strip_prefix("tcp://") {
-        return Ok(Box::new(tcp::bind(addr).await?));
+        return Ok(Box::new(tcp::bind(addr).await?) as Box<dyn Listener>);
     }
 
     #[cfg(all(unix, feature = "vsock"))]
@@ -59,11 +59,11 @@ pub async fn bind(addr: impl AsRef<str>) -> IoResult<Box<dyn Listener + Send>> {
     ))
 }
 
-pub async fn connect(addr: impl AsRef<str>) -> IoResult<Box<dyn Connection>> {
+pub async fn connect(addr: impl AsRef<str>) -> IoResult<impl Connection> {
     let addr = addr.as_ref();
 
     if let Some(addr) = addr.strip_prefix("tcp://") {
-        return Ok(Box::new(tcp::connect(addr).await?));
+        return Ok(Box::new(tcp::connect(addr).await?) as Box<dyn Connection>);
     }
 
     #[cfg(all(unix, feature = "vsock"))]

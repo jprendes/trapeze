@@ -4,9 +4,7 @@ use std::mem::replace;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use tokio::net::windows::named_pipe::{
-    ClientOptions, NamedPipeServer, ServerOptions,
-};
+use tokio::net::windows::named_pipe::{ClientOptions, NamedPipeServer, ServerOptions};
 use tokio::time::sleep;
 use windows_sys::Win32::Foundation::ERROR_PIPE_BUSY;
 
