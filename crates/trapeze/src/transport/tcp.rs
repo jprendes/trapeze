@@ -3,29 +3,20 @@ use std::io::Result as IoResult;
 use async_trait::async_trait;
 use tokio::net::{TcpListener, TcpStream};
 
-pub struct Listener {
-    inner: TcpListener,
-}
+use super::{Connection, Listener};
 
 #[async_trait]
-impl super::Listener for Listener {
-    async fn accept(&mut self) -> IoResult<Box<dyn super::Connection>> {
-        let (conn, _) = self.inner.accept().await?;
+impl Listener for TcpListener {
+    async fn accept(&mut self) -> IoResult<Box<dyn Connection>> {
+        let (conn, _) = TcpListener::accept(self).await?;
         Ok(Box::new(conn))
     }
 }
 
-pub async fn bind(addr: impl AsRef<str>) -> IoResult<Listener> {
-    let inner = TcpListener::bind(addr.as_ref()).await?;
-    Ok(Listener { inner })
+pub async fn bind(addr: impl AsRef<str>) -> IoResult<impl Listener> {
+    TcpListener::bind(addr.as_ref()).await
 }
 
-pub async fn connect(addr: impl AsRef<str>) -> IoResult<TcpStream> {
+pub async fn connect(addr: impl AsRef<str>) -> IoResult<impl Connection> {
     TcpStream::connect(addr.as_ref()).await
-}
-
-impl From<TcpListener> for Listener {
-    fn from(inner: TcpListener) -> Self {
-        Self { inner }
-    }
 }

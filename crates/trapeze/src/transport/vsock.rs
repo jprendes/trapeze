@@ -3,25 +3,20 @@ use std::io::{Error as IoError, ErrorKind, Result as IoResult};
 use async_trait::async_trait;
 use tokio_vsock::{VsockAddr, VsockListener, VsockStream};
 
-pub struct Listener {
-    inner: VsockListener,
-}
-
 #[async_trait]
-impl super::Listener for Listener {
+impl super::Listener for VsockListener {
     async fn accept(&mut self) -> IoResult<Box<dyn super::Connection>> {
-        let (conn, _) = self.inner.accept().await?;
+        let (conn, _) = VsockListener::accept(self).await?;
         Ok(Box::new(conn))
     }
 }
 
-pub fn bind(addr: impl AsRef<str>) -> IoResult<Listener> {
+pub fn bind(addr: impl AsRef<str>) -> IoResult<impl super::Listener> {
     let addr = parse_vsock_addr(addr)?;
-    let inner = VsockListener::bind(addr)?;
-    Ok(Listener { inner })
+    VsockListener::bind(addr)
 }
 
-pub async fn connect(addr: impl AsRef<str>) -> IoResult<VsockStream> {
+pub async fn connect(addr: impl AsRef<str>) -> IoResult<impl super::Connection> {
     let addr = parse_vsock_addr(addr)?;
     VsockStream::connect(addr).await
 }
@@ -51,10 +46,4 @@ fn parse_u32(num: &str) -> IoResult<u32> {
         num.parse()
     };
     num.map_err(|err| IoError::new(ErrorKind::InvalidInput, err))
-}
-
-impl From<VsockListener> for Listener {
-    fn from(inner: VsockListener) -> Self {
-        Self { inner }
-    }
 }

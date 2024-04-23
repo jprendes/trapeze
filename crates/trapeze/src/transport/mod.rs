@@ -20,7 +20,7 @@ pub trait Connection: AsyncRead + AsyncWrite + Send + Unpin + 'static {}
 impl<T: AsyncRead + AsyncWrite + Send + Unpin + 'static> Connection for T {}
 
 #[async_trait]
-pub trait Listener {
+pub trait Listener: 'static {
     async fn accept(&mut self) -> IoResult<Box<dyn Connection>>;
 }
 

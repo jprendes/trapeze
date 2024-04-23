@@ -5,19 +5,32 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use tokio::net::windows::named_pipe::{
-    ClientOptions, NamedPipeClient, NamedPipeServer, ServerOptions,
+    ClientOptions, NamedPipeServer, ServerOptions,
 };
 use tokio::time::sleep;
 use windows_sys::Win32::Foundation::ERROR_PIPE_BUSY;
 
-pub struct Listener {
+use super::{Connection, Listener};
+
+pub struct NamedPipeListener {
     inner: NamedPipeServer,
     name: OsString,
 }
 
+impl NamedPipeListener {
+    pub async fn bind(name: impl AsRef<str>) -> IoResult<Self> {
+        let name = name.as_ref().into();
+        let inner = ServerOptions::new()
+            .first_pipe_instance(true)
+            .create(&name)?;
+
+        Ok(Self { name, inner })
+    }
+}
+
 #[async_trait]
-impl super::Listener for Listener {
-    async fn accept(&mut self) -> IoResult<Box<dyn super::Connection>> {
+impl Listener for NamedPipeListener {
+    async fn accept(&mut self) -> IoResult<Box<dyn Connection>> {
         self.inner.connect().await?;
 
         let server = replace(&mut self.inner, ServerOptions::new().create(&self.name)?);
@@ -26,16 +39,11 @@ impl super::Listener for Listener {
     }
 }
 
-pub async fn bind(name: impl AsRef<str>) -> IoResult<Listener> {
-    let name = name.as_ref().into();
-    let inner = ServerOptions::new()
-        .first_pipe_instance(true)
-        .create(&name)?;
-
-    Ok(Listener { name, inner })
+pub async fn bind(name: impl AsRef<str>) -> IoResult<impl Listener> {
+    NamedPipeListener::bind(name).await
 }
 
-pub async fn connect(name: impl AsRef<str>) -> IoResult<NamedPipeClient> {
+pub async fn connect(name: impl AsRef<str>) -> IoResult<impl Connection> {
     let name = name.as_ref();
     let client = loop {
         match ClientOptions::new().open(name) {
