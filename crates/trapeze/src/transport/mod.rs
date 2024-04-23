@@ -4,16 +4,16 @@ use std::ops::DerefMut;
 use async_trait::async_trait;
 use tokio::io::{AsyncRead, AsyncWrite};
 
-mod tcp;
+pub mod tcp;
 
 #[cfg(unix)]
-mod unix;
+pub mod unix;
 
 #[cfg(windows)]
-mod windows;
+pub mod windows;
 
 #[cfg(all(unix, feature = "vsock"))]
-mod vsock;
+pub mod vsock;
 
 pub trait Connection: AsyncRead + AsyncWrite + Send + Unpin + 'static {}
 

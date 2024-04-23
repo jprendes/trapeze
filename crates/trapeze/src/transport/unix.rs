@@ -9,7 +9,7 @@ use tokio::net::{UnixListener, UnixStream};
 
 pub struct Listener {
     inner: UnixListener,
-    addr: String,
+    addr: Option<String>,
 }
 
 #[async_trait]
@@ -29,6 +29,7 @@ pub fn bind(addr: impl AsRef<str>) -> IoResult<Listener> {
         UnixListener::from_std(inner)?
     };
 
+    let addr = Some(addr);
     Ok(Listener { inner, addr })
 }
 
@@ -43,7 +44,9 @@ pub async fn connect(addr: impl AsRef<str>) -> IoResult<UnixStream> {
 
 impl Drop for Listener {
     fn drop(&mut self) {
-        cleanup_socket(&self.addr);
+        if let Some(addr) = &self.addr {
+            cleanup_socket(addr);
+        }
     }
 }
 
@@ -62,4 +65,11 @@ fn cleanup_socket(addr: &str) {
         return;
     }
     let _ = std::fs::remove_file(addr);
+}
+
+impl From<UnixListener> for Listener {
+    fn from(inner: UnixListener) -> Self {
+        let addr = None;
+        Self { inner, addr }
+    }
 }

@@ -23,3 +23,9 @@ pub async fn bind(addr: impl AsRef<str>) -> IoResult<Listener> {
 pub async fn connect(addr: impl AsRef<str>) -> IoResult<TcpStream> {
     TcpStream::connect(addr.as_ref()).await
 }
+
+impl From<TcpListener> for Listener {
+    fn from(inner: TcpListener) -> Self {
+        Self { inner }
+    }
+}

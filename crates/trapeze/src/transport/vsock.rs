@@ -52,3 +52,9 @@ fn parse_u32(num: &str) -> IoResult<u32> {
     };
     num.map_err(|err| IoError::new(ErrorKind::InvalidInput, err))
 }
+
+impl From<VsockListener> for Listener {
+    fn from(inner: VsockListener) -> Self {
+        Self { inner }
+    }
+}

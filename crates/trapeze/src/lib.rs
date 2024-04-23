@@ -4,7 +4,7 @@ mod id_pool;
 mod io;
 mod server;
 mod service;
-mod transport;
+pub mod transport;
 mod types;
 
 pub type Result<T, E = Status> = std::result::Result<T, E>;
@@ -22,8 +22,8 @@ pub mod __codegen_prelude {
     pub use crate::client::request_handlers::RequestHandler;
     pub use crate::server::method_handlers::MethodHandler;
     pub use crate::service::{
-        ClientStreamingMethod, DuplexStreamingMethod, ServerStreamingMethod, Service,
-        Sealed, UnaryMethod,
+        ClientStreamingMethod, DuplexStreamingMethod, Sealed, ServerStreamingMethod, Service,
+        UnaryMethod,
     };
 }
 
