@@ -67,6 +67,7 @@ impl<Msg: Message + Encodeable> Encodeable for Frame<Msg> {
             return Err(msg.into());
         }
 
+        #[allow(clippy::cast_possible_truncation)]
         buf.put_u32(length as u32);
         buf.put_u32(self.id);
         buf.put_u8(u8::from(Msg::TYPE_ID));

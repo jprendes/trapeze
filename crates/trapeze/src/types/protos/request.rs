@@ -113,6 +113,7 @@ impl<Payload: ProstField + Default> ::prost::Message for Request<Payload> {
         }
     }
     #[inline]
+    #[allow(clippy::if_not_else)]
     fn encoded_len(&self) -> usize {
         0 + if self.service != "" {
             ::prost::encoding::string::encoded_len(1u32, &self.service)
