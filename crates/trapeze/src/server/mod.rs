@@ -29,8 +29,7 @@ impl Server {
         Self::default()
     }
 
-    pub fn add_service(&mut self, service: impl Service) -> &mut Self {
-        let service = Arc::new(service);
+    pub fn register(&mut self, service: impl Service) -> &mut Self {
         self.methods.extend(service.methods());
         self
     }
@@ -81,9 +80,9 @@ impl ServerConnection {
         Self::new_with_services(connection, [])
     }
 
-    pub fn new_with_services<C: AsyncRead + AsyncWrite + Send + 'static>(
+    pub fn new_with_services<'a, C: AsyncRead + AsyncWrite + Send + 'static>(
         connection: C,
-        services: impl IntoIterator<Item = Arc<dyn Service>>,
+        services: impl IntoIterator<Item = &'a dyn Service>,
     ) -> ServerConnection {
         let mut methods = HashMap::default();
         for service in services {
@@ -104,8 +103,7 @@ impl ServerConnection {
         ServerConnection { io, methods, tasks }
     }
 
-    pub fn add_service(&mut self, service: impl Service) -> &mut Self {
-        let service = Arc::new(service);
+    pub fn register(&mut self, service: impl Service) -> &mut Self {
         self.methods.extend(service.methods());
         self
     }

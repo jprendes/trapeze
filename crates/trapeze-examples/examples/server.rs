@@ -15,7 +15,6 @@ use streaming::*;
 use types::*;
 
 #[derive(Clone, Default)]
-#[service(Health, AgentService, Streaming)]
 struct Services;
 
 impl Health for Services {
@@ -155,7 +154,7 @@ async fn main() {
 
     let server = async move {
         Server::new()
-            .add_service(Services)
+            .register(service!(Services : Health + AgentService + Streaming))
             .bind(ADDRESS)
             .await
             .expect("Server error");

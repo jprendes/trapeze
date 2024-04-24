@@ -6,7 +6,7 @@ use tokio::sync::Mutex;
 use crate::server::method_handlers::MethodHandler;
 
 pub trait Service: Send + Sync {
-    fn methods(self: Arc<Self>) -> Vec<(&'static str, Arc<dyn MethodHandler + Send + Sync>)>;
+    fn methods(&self) -> Vec<(&'static str, Arc<dyn MethodHandler + Send + Sync>)>;
 }
 
 pub struct UnaryMethod<Input, Output, Method> {
