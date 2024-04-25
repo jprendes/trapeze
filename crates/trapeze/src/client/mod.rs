@@ -27,6 +27,7 @@ pub struct Client {
 }
 
 struct ClientInner {
+    next_id: u32,
     io: MessageIo,
     tasks: JoinSet<IoResult<()>>,
 }
@@ -70,8 +71,9 @@ impl ClientInner {
     pub fn new<C: AsyncRead + AsyncWrite + Send + 'static>(connection: C) -> Self {
         let mut tasks = JoinSet::<IoResult<()>>::new();
         let io = MessageIo::new(&mut tasks, connection);
+        let next_id = 1;
 
-        Self { io, tasks }
+        Self { next_id, io, tasks }
     }
 
     pub async fn start(&mut self, mut req_rx: UnboundedReceiver<RequestFnBox>) -> IoResult<()> {
@@ -81,7 +83,9 @@ impl ClientInner {
                     res??;
                 },
                 Some(fcn) = req_rx.recv() => {
-                    let Some(stream) = self.io.stream(None) else {
+                    let id = self.next_id;
+                    self.next_id += 2;
+                    let Some(stream) = self.io.stream(id) else {
                         log::error!("Ran out of stream ids");
                         continue;
                     };

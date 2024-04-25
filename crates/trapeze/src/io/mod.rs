@@ -4,7 +4,6 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context as TaskContext, Poll};
 
-//use flume::{unbounded_channel, UnboundedReceiver, SendError, UnboundedSender};
 use prost::bytes::Bytes;
 use thiserror::Error;
 use tokio::io::{split, AsyncRead, AsyncWrite, AsyncWriteExt};
@@ -158,7 +157,7 @@ impl MessageReceiver {
         None
     }
 
-    fn stream(&mut self, id: impl Into<Option<u32>>) -> Option<StreamReceiver> {
+    fn stream(&mut self, id: u32) -> Option<StreamReceiver> {
         let (tx, rx) = unbounded_channel();
         let guard = self.streams.claim(id, tx)?;
         let guard = Arc::new(guard);
@@ -179,7 +178,7 @@ impl MessageIo {
         Self { tx, rx }
     }
 
-    pub fn stream(&mut self, id: impl Into<Option<u32>>) -> Option<StreamIo> {
+    pub fn stream(&mut self, id: u32) -> Option<StreamIo> {
         let rx = self.rx.stream(id)?;
         let tx = self.tx.stream(rx.id());
         Some(StreamIo { tx, rx })

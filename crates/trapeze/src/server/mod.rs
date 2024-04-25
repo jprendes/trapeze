@@ -29,6 +29,7 @@ impl Server {
         Self::default()
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     pub fn register(&mut self, service: impl Service) -> &mut Self {
         self.methods.extend(service.methods());
         self
@@ -77,10 +78,10 @@ pub struct ServerConnection {
 
 impl ServerConnection {
     pub fn new<C: AsyncRead + AsyncWrite + Send + 'static>(connection: C) -> ServerConnection {
-        Self::new_with_services(connection, [])
+        Self::new_with(connection, [])
     }
 
-    pub fn new_with_services<'a, C: AsyncRead + AsyncWrite + Send + 'static>(
+    pub fn new_with<'a, C: AsyncRead + AsyncWrite + Send + 'static>(
         connection: C,
         services: impl IntoIterator<Item = &'a dyn Service>,
     ) -> ServerConnection {
@@ -103,6 +104,7 @@ impl ServerConnection {
         ServerConnection { io, methods, tasks }
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     pub fn register(&mut self, service: impl Service) -> &mut Self {
         self.methods.extend(service.methods());
         self
