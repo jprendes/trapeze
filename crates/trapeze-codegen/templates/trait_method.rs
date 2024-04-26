@@ -1,7 +1,8 @@
 __method_comments__
+#[allow(unused_variables)]
 fn __method_name__(
     &self,
-    ___method_input_name__: __method_input_type__,
+    __method_input_name__: __method_input_type__,
 ) -> __method_output_type__ {
     let not_found = trapeze::Status {
         code: trapeze::Code::NotFound as i32,
