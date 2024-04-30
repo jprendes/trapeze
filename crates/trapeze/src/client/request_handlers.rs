@@ -82,7 +82,7 @@ impl RequestHandler for Client {
         payload: Input,
     ) -> Result<Output> {
         let (output_tx, output_rx) = oneshot::channel();
-        let metadata = self.context.metadata.iter().collect();
+        let metadata = self.context.metadata.keyvalue_iter().collect();
         let timeout = self.context.timeout;
 
         let fut = self.spawn_stream(move |mut stream| async move {
@@ -132,7 +132,7 @@ impl RequestHandler for Client {
         payload: Input,
     ) -> impl Stream<Item = Result<Output>> + Send {
         let (output_tx, mut output_rx) = unbounded_channel();
-        let metadata = self.context.metadata.iter().collect();
+        let metadata = self.context.metadata.keyvalue_iter().collect();
         let timeout = self.context.timeout;
 
         let fut = self.spawn_stream(move |mut stream| async move {
@@ -190,7 +190,7 @@ impl RequestHandler for Client {
     ) -> Result<Output> {
         let (output_tx, output_rx) = oneshot::channel();
         let (input, input_fut) = handle_input_stream(input);
-        let metadata = self.context.metadata.iter().collect();
+        let metadata = self.context.metadata.keyvalue_iter().collect();
         let timeout = self.context.timeout;
 
         let fut = self.spawn_stream(move |mut stream| async move {
@@ -244,7 +244,7 @@ impl RequestHandler for Client {
     ) -> impl Stream<Item = Result<Output>> + Send {
         let (output_tx, mut output_rx) = unbounded_channel::<Output>();
         let (input, input_fut) = handle_input_stream(input);
-        let metadata = self.context.metadata.iter().collect();
+        let metadata = self.context.metadata.keyvalue_iter().collect();
         let timeout = self.context.timeout;
 
         let fut = self.spawn_stream(move |mut stream| async move {

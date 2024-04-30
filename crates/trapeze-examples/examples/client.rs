@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use futures::TryStreamExt;
 use tokio::time::sleep;
 use trapeze::stream::stream;
-use trapeze::Client;
+use trapeze::{Client, ClientExt as _};
 
 mod common;
 

@@ -76,7 +76,7 @@ where
 
 impl From<Metadata> for Vec<KeyValue> {
     fn from(metadata: Metadata) -> Self {
-        metadata.iter().collect()
+        metadata.keyvalue_iter().collect()
     }
 }
 
@@ -93,7 +93,7 @@ impl From<Option<HashMap<String, Vec<String>>>> for Metadata {
 }
 
 impl Metadata {
-    pub fn iter(&self) -> impl '_ + Iterator<Item = KeyValue> {
+    pub(crate) fn keyvalue_iter(&self) -> impl '_ + Iterator<Item = KeyValue> {
         self.0.iter().flat_map(|(k, v)| {
             v.iter().map(|v| KeyValue {
                 key: k.clone(),

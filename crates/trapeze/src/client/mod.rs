@@ -1,5 +1,6 @@
 use std::future::Future;
 use std::io::Result as IoResult;
+use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 use futures::FutureExt;
@@ -22,8 +23,8 @@ type RequestFnBox = Box<dyn FnOnce(StreamIo, &mut JoinSet<IoResult<()>>) + Send>
 #[derive(Clone)]
 pub struct Client {
     tx: UnboundedSender<RequestFnBox>,
-    tasks: Arc<JoinSet<IoResult<()>>>,
-    pub context: Context,
+    _tasks: Arc<JoinSet<IoResult<()>>>,
+    context: Context,
 }
 
 struct ClientInner {
@@ -32,38 +33,16 @@ struct ClientInner {
     tasks: JoinSet<IoResult<()>>,
 }
 
-impl Client {
-    #[must_use]
-    pub fn with_metadata(&self, metadata: impl Into<Metadata>) -> Self {
-        Self {
-            tx: self.tx.clone(),
-            tasks: self.tasks.clone(),
-            context: Context {
-                timeout: self.context.timeout,
-                metadata: metadata.into(),
-            },
-        }
+impl Deref for Client {
+    type Target = Context;
+    fn deref(&self) -> &Self::Target {
+        &self.context
     }
+}
 
-    #[must_use]
-    pub fn with_timeout(&self, timeout: impl Into<Timeout>) -> Self {
-        Self {
-            tx: self.tx.clone(),
-            tasks: self.tasks.clone(),
-            context: Context {
-                timeout: timeout.into(),
-                metadata: self.context.metadata.clone(),
-            },
-        }
-    }
-
-    #[must_use]
-    pub fn with_context(&self, context: impl Into<Context>) -> Self {
-        Self {
-            tx: self.tx.clone(),
-            tasks: self.tasks.clone(),
-            context: context.into(),
-        }
+impl DerefMut for Client {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.context
     }
 }
 
@@ -116,7 +95,11 @@ impl Client {
 
         let tasks = Arc::new(tasks);
 
-        Self { tx, tasks, context }
+        Self {
+            tx,
+            _tasks: tasks,
+            context,
+        }
     }
 
     pub async fn connect(address: impl AsRef<str>) -> IoResult<Self> {
@@ -143,5 +126,36 @@ impl Client {
             result
         }
         .fuse()
+    }
+}
+
+pub trait ClientExt: Clone + Deref<Target = Context> + DerefMut {
+    #[must_use]
+    fn with_metadata(&self, metadata: impl Into<Metadata>) -> Self {
+        let mut this = self.clone();
+        this.metadata = metadata.into();
+        this
+    }
+
+    #[must_use]
+    fn with_timeout(&self, timeout: impl Into<Timeout>) -> Self {
+        let mut this = self.clone();
+        this.timeout = timeout.into();
+        this
+    }
+
+    #[must_use]
+    fn with_context(&self, context: impl Into<Context>) -> Self {
+        let mut this = self.clone();
+        *this = context.into();
+        this
+    }
+}
+
+impl<T: Clone + Deref<Target = Context> + DerefMut> ClientExt for T {}
+
+impl AsRef<Client> for Client {
+    fn as_ref(&self) -> &Client {
+        self
     }
 }

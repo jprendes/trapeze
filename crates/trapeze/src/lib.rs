@@ -9,7 +9,7 @@ mod types;
 
 pub type Result<T, E = Status> = std::result::Result<T, E>;
 
-pub use client::Client;
+pub use client::{Client, ClientExt};
 pub use context::metadata::Metadata;
 pub use context::timeout::Timeout;
 pub use context::{get_context, try_get_context, Context};
