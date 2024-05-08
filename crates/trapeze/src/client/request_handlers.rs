@@ -98,7 +98,8 @@ impl RequestHandler for Client {
                         timeout_nano: timeout.as_nanos(),
                     },
                 })
-                .await?;
+                .await
+                .map_err(Status::send_error)?;
 
             let rx = RwLock::new(&mut stream.rx);
 
@@ -148,7 +149,8 @@ impl RequestHandler for Client {
                         timeout_nano: timeout.as_nanos(),
                     },
                 })
-                .await?;
+                .await
+                .map_err(Status::send_error)?;
 
             let rx = RwLock::new(&mut stream.rx);
 
@@ -206,7 +208,8 @@ impl RequestHandler for Client {
                         timeout_nano: timeout.as_nanos(),
                     },
                 })
-                .await?;
+                .await
+                .map_err(Status::send_error)?;
 
             let rx = RwLock::new(&mut stream.rx);
 
@@ -260,7 +263,8 @@ impl RequestHandler for Client {
                         timeout_nano: timeout.as_nanos(),
                     },
                 })
-                .await?;
+                .await
+                .map_err(Status::send_error)?;
 
             let rx = RwLock::new(&mut stream.rx);
 
@@ -312,7 +316,7 @@ async fn handle_client_stream<Input: prost::Message + Default>(
 
     tokio::pin!(strm);
     while let Some(data) = strm.next().await {
-        tx.data(data).await?;
+        tx.data(data).await.map_err(Status::send_error)?;
     }
 
     Ok(())
@@ -327,12 +331,17 @@ fn handle_server_unary<'a, Output: prost::Message + Default + 'a>(
         let Some(frame) = rx.recv().await else {
             return Err(Status::channel_closed());
         };
-        let response: Response = frame.message.decode()?;
+        let response: Response = frame.message.decode().map_err(Status::failed_to_decode)?;
         let status = response.status.unwrap_or_default();
         if status.code != Code::Ok as i32 {
             return Err(status);
         }
-        let _ = tx.send(response.payload.decode()?);
+        let _ = tx.send(
+            response
+                .payload
+                .decode()
+                .map_err(Status::failed_to_decode)?,
+        );
         Ok(())
     }
 }
@@ -345,17 +354,23 @@ fn handle_server_stream<'a, Output: prost::Message + Default + 'a>(
     async move {
         while let Some(frame) = rx.recv().await {
             if let Ok(response) = frame.message.decode::<Response>() {
-                response.payload.ensure_empty()?;
+                response
+                    .payload
+                    .ensure_empty()
+                    .map_err(Status::failed_to_decode)?;
                 let status = response.status.unwrap_or_default();
                 return Err(status);
             }
 
-            let Data { payload } = frame.message.decode::<Data>()?;
+            let Data { payload } = frame
+                .message
+                .decode::<Data>()
+                .map_err(Status::failed_to_decode)?;
 
             if frame.flags.contains(Flags::NO_DATA) {
-                payload.ensure_empty()?;
+                payload.ensure_empty().map_err(Status::failed_to_decode)?;
             } else {
-                let _ = tx.send(payload.decode()?);
+                let _ = tx.send(payload.decode().map_err(Status::failed_to_decode)?);
             }
 
             if frame.flags.contains(Flags::REMOTE_CLOSED) {

@@ -1,6 +1,5 @@
 use std::fmt::Display;
 
-use prost::EncodeError;
 pub use prost_types::Any;
 use thiserror::Error;
 
@@ -29,6 +28,18 @@ pub struct Status {
     pub details: Vec<Any>,
 }
 
+macro_rules! constructor {
+    ($method:ident, $variant:ident) => {
+        pub fn $method(message: impl Into<String>) -> Self {
+            Status {
+                code: Code::$variant as i32,
+                message: message.into(),
+                details: vec![],
+            }
+        }
+    };
+}
+
 impl Status {
     pub fn new(code: Code, message: impl Into<String>) -> Self {
         let code = code as i32;
@@ -41,53 +52,22 @@ impl Status {
         }
     }
 
-    fn invalid_argument(message: impl Into<String>) -> Self {
-        Status {
-            code: Code::InvalidArgument as i32,
-            message: message.into(),
-            details: vec![],
-        }
-    }
-
-    fn not_found(message: impl Into<String>) -> Self {
-        Status {
-            code: Code::NotFound as i32,
-            message: message.into(),
-            details: vec![],
-        }
-    }
-
-    fn internal(message: impl Into<String>) -> Self {
-        Status {
-            code: Code::Internal as i32,
-            message: message.into(),
-            details: vec![],
-        }
-    }
-
-    fn deadline_exceeded(message: impl Into<String>) -> Self {
-        Status {
-            code: Code::DeadlineExceeded as i32,
-            message: message.into(),
-            details: vec![],
-        }
-    }
-
-    fn unknown(message: impl Into<String>) -> Self {
-        Status {
-            code: Code::Unknown as i32,
-            message: message.into(),
-            details: vec![],
-        }
-    }
-
-    fn aborted(message: impl Into<String>) -> Self {
-        Status {
-            code: Code::Aborted as i32,
-            message: message.into(),
-            details: vec![],
-        }
-    }
+    constructor! {cancelled, Cancelled}
+    constructor! {unknown, Unknown}
+    constructor! {invalid_argument, InvalidArgument}
+    constructor! {deadline_exceeded, DeadlineExceeded}
+    constructor! {not_found, NotFound}
+    constructor! {already_exists, AlreadyExists}
+    constructor! {permission_denied, PermissionDenied}
+    constructor! {unauthenticated, Unauthenticated}
+    constructor! {resource_exhausted, ResourceExhausted}
+    constructor! {failed_precondition, FailedPrecondition}
+    constructor! {aborted, Aborted}
+    constructor! {out_of_range, OutOfRange}
+    constructor! {unimplemented, Unimplemented}
+    constructor! {internal, Internal}
+    constructor! {unavailable, Unavailable}
+    constructor! {data_loss, DataLoss}
 
     pub(crate) fn stream_in_use(stream_id: u32) -> Self {
         Self::invalid_argument(format!("Stream `{stream_id}` is already in use"))
@@ -116,12 +96,14 @@ impl Status {
         Self::not_found(msg)
     }
 
-    pub(crate) fn failed_to_encode(err: &EncodeError) -> Self {
-        Status::invalid_argument(format!("Error encoding message: {err}"))
+    #[allow(clippy::needless_pass_by_value)]
+    pub(crate) fn failed_to_decode(err: DecodeError) -> Self {
+        Status::invalid_argument(format!("Error decoding message: {err}"))
     }
 
-    pub(crate) fn failed_to_decode(err: &DecodeError) -> Self {
-        Status::invalid_argument(format!("Error decoding message: {err}"))
+    #[allow(clippy::needless_pass_by_value)]
+    pub(crate) fn send_error(err: SendError) -> Self {
+        Status::internal(format!("Error sending message: {err}"))
     }
 
     pub(crate) fn invalid_request_flags(expected: Flags, actual: Flags) -> Self {
@@ -139,21 +121,22 @@ impl Status {
     }
 }
 
-impl From<DecodeError> for Status {
-    fn from(value: DecodeError) -> Self {
-        Self::failed_to_decode(&value)
-    }
+pub trait StatusExt {
+    type Output;
+    fn or_status(self, code: Code) -> Result<Self::Output, Status>;
 }
 
-impl From<EncodeError> for Status {
-    fn from(value: EncodeError) -> Self {
-        Self::failed_to_encode(&value)
-    }
-}
-
-impl From<SendError> for Status {
-    fn from(value: SendError) -> Self {
-        Self::internal(format!("{value}"))
+impl<T, E: ToString> StatusExt for Result<T, E> {
+    type Output = T;
+    fn or_status(self, code: Code) -> Result<Self::Output, Status> {
+        match self {
+            Ok(val) => Ok(val),
+            Err(err) => Err(Status {
+                code: code as i32,
+                message: err.to_string(),
+                details: vec![],
+            }),
+        }
     }
 }
 

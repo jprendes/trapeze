@@ -152,13 +152,11 @@ impl Streaming for Services {
 async fn main() {
     let _ = remove_file(ADDRESS).await;
 
-    let server = async move {
-        Server::new()
-            .register(service!(Services : Health + AgentService + Streaming))
-            .bind(ADDRESS)
-            .await
-            .expect("Server error");
-    };
+    let handle = Server::new()
+        .register(service!(Services : Health + AgentService + Streaming))
+        .bind(ADDRESS)
+        .await
+        .expect("Error binding listener");
 
     let ctrl_c = async move {
         ctrl_c().await.expect("Failed to wait for Ctrl+C.");
@@ -167,8 +165,10 @@ async fn main() {
     println!("Listening on {ADDRESS}");
     println!("Press Ctrl+C to exit.");
 
-    tokio::select! {
-        _ = server => {},
-        _ = ctrl_c => {},
-    };
+    ctrl_c.await;
+    println!();
+    println!("Shutting down server");
+
+    handle.shutdown();
+    handle.await.expect("Error shutting down server");
 }

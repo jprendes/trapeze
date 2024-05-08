@@ -4,7 +4,6 @@ use syn::parse::Parse;
 use syn::punctuated::Punctuated;
 use syn::{parse_macro_input, Token};
 
-
 struct ServiceInput {
     expr: syn::Expr,
     traits: Punctuated<syn::Path, Token![+]>,

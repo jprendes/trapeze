@@ -13,8 +13,9 @@ pub use client::{Client, ClientExt};
 pub use context::metadata::Metadata;
 pub use context::timeout::Timeout;
 pub use context::{get_context, try_get_context, Context};
-pub use server::{Server, ServerConnection};
+pub use server::{Server, ServerConnection, ServerHandle};
 pub use trapeze_macros::*;
+pub use types::protos::status::StatusExt;
 pub use types::protos::{Code, Status};
 
 #[doc(hidden)]

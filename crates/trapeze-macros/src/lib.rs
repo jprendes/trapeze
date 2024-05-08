@@ -1,9 +1,9 @@
 use proc_macro::TokenStream;
 
 mod as_client;
-mod service;
 mod include_protos;
 mod inline_includes;
+mod service;
 
 #[proc_macro]
 pub fn include_protos(input: TokenStream) -> TokenStream {

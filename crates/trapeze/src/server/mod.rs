@@ -1,10 +1,12 @@
 use std::collections::HashMap;
-use std::io::{ErrorKind, Result as IoResult};
+use std::io::{Error as IoError, ErrorKind, Result as IoResult};
 use std::sync::Arc;
+use std::task::{ready, Poll};
 
+use futures::{pin_mut, Future, FutureExt};
 use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::pin;
-use tokio::task::JoinSet;
+use tokio::sync::Notify;
+use tokio::task::{JoinHandle, JoinSet};
 
 use crate::context::timeout::Timeout;
 use crate::context::{Context, WithContext};
@@ -23,50 +25,109 @@ pub struct Server {
     tasks: JoinSet<IoResult<()>>,
 }
 
+pub struct ServerHandle {
+    shutdown: Arc<Notify>,
+    handle: JoinHandle<IoResult<()>>,
+}
+
+impl Drop for ServerHandle {
+    fn drop(&mut self) {
+        self.handle.abort();
+    }
+}
+
+impl ServerHandle {
+    pub fn terminate(&self) {
+        self.handle.abort();
+    }
+
+    pub fn shutdown(&self) {
+        self.shutdown.notify_waiters();
+    }
+}
+
+impl Future for ServerHandle {
+    type Output = IoResult<()>;
+    fn poll(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        match ready!(self.handle.poll_unpin(cx)) {
+            Ok(res) => Poll::Ready(res),
+            Err(_) => Poll::Ready(Err(IoError::new(
+                ErrorKind::Interrupted,
+                "TTRPC server terminated abruptly",
+            ))),
+        }
+    }
+}
+
 impl Server {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[must_use]
     #[allow(clippy::needless_pass_by_value)]
-    pub fn register(&mut self, service: impl Service) -> &mut Self {
+    pub fn register(mut self, service: impl Service) -> Self {
         self.methods.extend(service.methods());
         self
     }
 
-    pub async fn bind(&mut self, address: impl AsRef<str>) -> IoResult<()> {
-        let mut listener = bind(address).await?;
-        self.start(&mut listener).await
+    pub async fn bind(self, address: impl AsRef<str>) -> IoResult<ServerHandle> {
+        let listener = bind(address).await?;
+        Ok(self.start(listener))
     }
 
-    pub async fn start(&mut self, listener: &mut impl Listener) -> IoResult<()> {
-        pin!(listener);
-        loop {
-            tokio::select! {
-                Some(res) = self.tasks.join_next() => {
-                    match res? {
-                        Err(err) if err.kind() == ErrorKind::UnexpectedEof => {},
-                        Ok(()) => {},
-                        Err(err) => log::error!("Error handling client connection: {err}"),
+    pub fn start(mut self, mut listener: impl Listener) -> ServerHandle {
+        let shutdown = Arc::new(Notify::new());
+        let handle = tokio::spawn({
+            let shutdown = shutdown.clone();
+            async move {
+                let shutdown = shutdown.notified().fuse();
+                pin_mut!(shutdown);
+                loop {
+                    tokio::select! {
+                        conn = listener.accept() => {
+                            let Ok(conn) = conn else {
+                                continue;
+                            };
+                            let methods = self.methods.clone();
+                            self.tasks.spawn(async move {
+                                ServerConnection::new_with_methods(conn, methods)
+                                    .start()
+                                    .await
+                            });
+                        },
+                        Some(res) = self.tasks.join_next() => {
+                            handle_task_result(res?);
+                        },
+                        () = &mut shutdown => break,
+                        else => break,
                     }
-                },
-                conn = listener.accept() => {
-                    let Ok(conn) = conn else {
-                        continue;
-                    };
-                    let methods = self.methods.clone();
-                    self.tasks.spawn(async move {
-                        ServerConnection::new_with_methods(conn, methods)
-                            .start()
-                            .await
-                    });
-                },
-                else => break,
-            }
-        }
+                }
 
-        Ok(())
+                drop(listener);
+
+                // drain any remaining tasks after a shutdown
+                while let Some(res) = self.tasks.join_next().await {
+                    handle_task_result(res?);
+                }
+
+                Ok(())
+            }
+        });
+
+        ServerHandle { shutdown, handle }
+    }
+}
+
+fn handle_task_result(result: IoResult<()>) {
+    match result {
+        Err(err) if err.kind() == ErrorKind::UnexpectedEof => {}
+        Ok(()) => {}
+        Err(err) => log::error!("Error handling client connection: {err}"),
     }
 }
 

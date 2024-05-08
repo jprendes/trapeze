@@ -73,15 +73,15 @@ pub fn include_protos(input: TokenStream) -> TokenStream {
     let span = proc_macro2::TokenStream::from(input.clone()).span();
     let IncludeProtosInput { files, includes } = parse_macro_input!(input as IncludeProtosInput);
 
-    include_protos_impl(files, includes).unwrap_or_else(|err| {
+    include_protos_impl(&files, &includes).unwrap_or_else(|err| {
         let err = Error::new(span, err);
         err.into_compile_error().into()
     })
 }
 
 fn include_protos_impl(
-    files: Array<LitStr>,
-    includes: Option<Array<LitStr>>,
+    files: &Array<LitStr>,
+    includes: &Option<Array<LitStr>>,
 ) -> Result<TokenStream> {
     let root = env_path("CARGO_MANIFEST_DIR")?;
     let out_dir = tempdir()?;

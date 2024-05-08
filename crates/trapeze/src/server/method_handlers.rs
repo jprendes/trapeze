@@ -53,7 +53,7 @@ impl<
 
         let rx = RwLock::new(&mut stream.rx);
 
-        let payload: Input = payload.decode()?;
+        let payload: Input = payload.decode().map_err(Status::failed_to_decode)?;
 
         let fut = (self.method)(payload);
 
@@ -88,7 +88,7 @@ impl<
             return Err(Status::invalid_request_flags(Flags::REMOTE_CLOSED, flags));
         }
 
-        let payload: Input = payload.decode()?;
+        let payload: Input = payload.decode().map_err(Status::failed_to_decode)?;
 
         let output_strm = (self.method)(payload);
 
@@ -126,7 +126,7 @@ impl<
             ));
         }
 
-        let () = payload.decode()?;
+        let () = payload.decode().map_err(Status::failed_to_decode)?;
 
         let (input_tx, input_strm) = make_input_stream();
 
@@ -168,7 +168,7 @@ impl<
             ));
         }
 
-        let () = payload.decode()?;
+        let () = payload.decode().map_err(Status::failed_to_decode)?;
 
         let (input_tx, input_strm) = make_input_stream();
 
@@ -204,12 +204,15 @@ fn handle_client_stream<'a, Input: prost::Message + Default + 'a>(
     let mut rx = rx.try_write().unwrap();
     async move {
         while let Some(frame) = rx.recv().await {
-            let Data { payload } = frame.message.decode::<Data>()?;
+            let Data { payload } = frame
+                .message
+                .decode::<Data>()
+                .map_err(Status::failed_to_decode)?;
 
             if frame.flags.contains(Flags::NO_DATA) {
-                payload.ensure_empty()?;
+                payload.ensure_empty().map_err(Status::failed_to_decode)?;
             } else {
-                let _ = tx.send(payload.decode()?);
+                let _ = tx.send(payload.decode().map_err(Status::failed_to_decode)?);
             }
 
             if frame.flags.contains(Flags::REMOTE_CLOSED) {
@@ -236,10 +239,10 @@ async fn handle_server_stream<Output: prost::Message + Default>(
     tokio::pin!(strm);
 
     while let Some(data) = strm.try_next().await? {
-        tx.data(data).await?;
+        tx.data(data).await.map_err(Status::send_error)?;
     }
 
-    tx.close_data().await?;
+    tx.close_data().await.map_err(Status::send_error)?;
 
     Ok(())
 }
@@ -249,7 +252,7 @@ async fn handle_server_unary<Output: prost::Message + Default>(
     fut: impl Future<Output = Result<Output>>,
 ) -> Result<()> {
     let response = fut.await?;
-    tx.respond(response).await?;
+    tx.respond(response).await.map_err(Status::send_error)?;
     Ok(())
 }
 
