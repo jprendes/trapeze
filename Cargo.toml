@@ -23,8 +23,8 @@ trapeze-macros = { path = "crates/trapeze-macros", version = "0.6.0" }
 trapeze-examples = { path = "crates/trapeze-examples", version = "0.6.0" }
 
 # common packages
-prost-build = "0.12"
-prost = "0.12"
+prost-build = "0.13"
+prost = "0.13"
 tokio = "1"
 
 [profile.release]

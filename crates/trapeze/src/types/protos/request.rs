@@ -41,10 +41,7 @@ pub struct Request<Payload: ProstMessage + Default> {
 #[allow(clippy::all)]
 impl<Payload: ProstField + Default> ::prost::Message for Request<Payload> {
     #[allow(unused_variables)]
-    fn encode_raw<B>(&self, buf: &mut B)
-    where
-        B: ::prost::bytes::BufMut,
-    {
+    fn encode_raw(&self, buf: &mut impl ::prost::bytes::BufMut) {
         if self.service != "" {
             ::prost::encoding::string::encode(1u32, &self.service, buf);
         }
@@ -60,16 +57,13 @@ impl<Payload: ProstField + Default> ::prost::Message for Request<Payload> {
         }
     }
     #[allow(unused_variables)]
-    fn merge_field<B>(
+    fn merge_field(
         &mut self,
         tag: u32,
         wire_type: ::prost::encoding::WireType,
-        buf: &mut B,
+        buf: &mut impl ::prost::bytes::Buf,
         ctx: ::prost::encoding::DecodeContext,
-    ) -> ::core::result::Result<(), ::prost::DecodeError>
-    where
-        B: ::prost::bytes::Buf,
-    {
+    ) -> ::core::result::Result<(), ::prost::DecodeError> {
         const STRUCT_NAME: &'static str = "Request";
         match tag {
             1u32 => {
