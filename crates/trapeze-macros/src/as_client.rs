@@ -2,7 +2,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse::Parse;
 use syn::punctuated::Punctuated;
-use syn::{parse_macro_input, Token};
+use syn::{parse, Token};
 
 struct AsClientInput {
     expr: syn::Expr,
@@ -18,8 +18,8 @@ impl Parse for AsClientInput {
     }
 }
 
-pub fn as_client(input: TokenStream) -> TokenStream {
-    let AsClientInput { expr, traits, .. } = parse_macro_input!(input as AsClientInput);
+pub fn as_client(input: TokenStream) -> syn::Result<TokenStream> {
+    let AsClientInput { expr, traits, .. } = parse(input)?;
     let out = quote! {
         {
             {
@@ -31,5 +31,5 @@ pub fn as_client(input: TokenStream) -> TokenStream {
         }
     };
 
-    out.into()
+    Ok(out.into())
 }

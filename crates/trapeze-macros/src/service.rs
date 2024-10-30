@@ -2,7 +2,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse::Parse;
 use syn::punctuated::Punctuated;
-use syn::{parse_macro_input, Token};
+use syn::{parse, Token};
 
 struct ServiceInput {
     expr: syn::Expr,
@@ -18,8 +18,8 @@ impl Parse for ServiceInput {
     }
 }
 
-pub fn service(input: TokenStream) -> TokenStream {
-    let ServiceInput { expr, traits, .. } = parse_macro_input!(input as ServiceInput);
+pub fn service(input: TokenStream) -> syn::Result<TokenStream> {
+    let ServiceInput { expr, traits, .. } = parse(input)?;
     let traits_vec = traits.iter().cloned().collect::<Vec<_>>();
     let out = quote! {
         {
@@ -42,5 +42,5 @@ pub fn service(input: TokenStream) -> TokenStream {
         }
     };
 
-    out.into()
+    Ok(out.into())
 }

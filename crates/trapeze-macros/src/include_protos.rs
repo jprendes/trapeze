@@ -8,7 +8,7 @@ use syn::parse::Parse;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::Comma;
-use syn::{bracketed, parse_macro_input, Error, LitStr};
+use syn::{bracketed, parse, Error, LitStr};
 use tempfile::tempdir;
 use trapeze_codegen::Config;
 
@@ -69,14 +69,11 @@ impl Parse for IncludeProtosInput {
     }
 }
 
-pub fn include_protos(input: TokenStream) -> TokenStream {
+pub fn include_protos(input: TokenStream) -> syn::Result<TokenStream> {
     let span = proc_macro2::TokenStream::from(input.clone()).span();
-    let IncludeProtosInput { files, includes } = parse_macro_input!(input as IncludeProtosInput);
+    let IncludeProtosInput { files, includes } = parse(input)?;
 
-    include_protos_impl(&files, &includes).unwrap_or_else(|err| {
-        let err = Error::new(span, err);
-        err.into_compile_error().into()
-    })
+    include_protos_impl(&files, &includes).map_err(|err| Error::new(span, err))
 }
 
 fn include_protos_impl(

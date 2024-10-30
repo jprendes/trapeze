@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
-use std::usize;
 
 use crate::types::protos::KeyValue;
 
