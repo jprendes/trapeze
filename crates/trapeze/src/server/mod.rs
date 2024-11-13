@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::io::{ErrorKind, Result as IoResult};
 use std::sync::Arc;
 
-use controller::WithServerController;
 use futures::{pin_mut, FutureExt};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::task::JoinSet;
@@ -20,7 +19,7 @@ pub mod controller;
 pub mod handle;
 pub mod method_handlers;
 
-pub use controller::{get_server, try_get_server, ServerController};
+pub use controller::ServerController;
 pub use handle::ServerHandle;
 
 #[derive(Default)]
@@ -48,7 +47,7 @@ impl Server {
     }
 
     pub fn start(mut self, mut listener: impl Listener) -> ServerHandle {
-        ServerHandle::spawn(move |shutdown| async move {
+        ServerHandle::spawn(move |controller, shutdown| async move {
             let shutdown = shutdown.notified().fuse();
             pin_mut!(shutdown);
             loop {
@@ -58,11 +57,13 @@ impl Server {
                             continue;
                         };
                         let methods = self.methods.clone();
+                        let controller = controller.clone();
                         self.tasks.spawn(async move {
                             ServerConnection::new_with_methods(conn, methods)
+                                .with_controller(controller)
                                 .start()
                                 .await
-                        }.inherit_server());
+                        });
                     },
                     Some(res) = self.tasks.join_next() => {
                         handle_task_result(res?);
@@ -96,6 +97,7 @@ pub struct ServerConnection {
     io: MessageIo,
     methods: HashMap<&'static str, Arc<dyn MethodHandler + Send + Sync>>,
     tasks: JoinSet<IoResult<()>>,
+    controller: Option<ServerController>,
 }
 
 impl ServerConnection {
@@ -115,6 +117,11 @@ impl ServerConnection {
         Self::new_with_methods(connection, methods)
     }
 
+    fn with_controller(&mut self, controller: ServerController) -> &mut Self {
+        self.controller = Some(controller);
+        self
+    }
+
     fn new_with_methods<C: AsyncRead + AsyncWrite + Send + 'static>(
         connection: C,
         methods: impl Into<HashMap<&'static str, Arc<dyn MethodHandler + Send + Sync>>>,
@@ -122,8 +129,14 @@ impl ServerConnection {
         let mut tasks = JoinSet::<IoResult<()>>::new();
         let io = MessageIo::new(&mut tasks, connection);
         let methods = methods.into();
+        let controller = None;
 
-        ServerConnection { io, methods, tasks }
+        ServerConnection {
+            io,
+            methods,
+            tasks,
+            controller,
+        }
     }
 
     #[allow(clippy::needless_pass_by_value)]
@@ -200,8 +213,7 @@ impl ServerConnection {
                 }
                 Ok(())
             }
-            .with_context(ctx)
-            .inherit_server(),
+            .with_context(ctx, self.controller.clone()),
         );
     }
 }

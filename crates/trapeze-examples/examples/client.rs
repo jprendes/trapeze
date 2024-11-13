@@ -1,7 +1,6 @@
 use std::time::{Duration, Instant};
 
 use futures::TryStreamExt;
-use tokio::time::sleep;
 use trapeze::stream::stream;
 use trapeze::{Client, ClientExt as _};
 
@@ -56,7 +55,7 @@ async fn grpc_list_interfaces(client: Client, start: Instant) {
 }
 
 async fn grpc_online_cpu_mem(client: Client, start: Instant) {
-    sleep(Duration::from_millis(22)).await;
+    //sleep(Duration::from_secs(5)).await;
 
     let req = OnlineCpuMemRequest::default();
     let res = client.online_cpu_mem(req).await;

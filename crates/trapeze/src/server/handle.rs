@@ -54,7 +54,7 @@ impl Future for ServerHandle {
 
 impl ServerHandle {
     pub(super) fn spawn<F: Future<Output = IoResult<()>> + Send + 'static>(
-        fut_fn: impl Send + 'static + FnOnce(Arc<Notify>) -> F,
+        fut_fn: impl Send + 'static + FnOnce(ServerController, Arc<Notify>) -> F,
     ) -> Self {
         let (controller, task) = ServerController::control(fut_fn);
         let handle = tokio::spawn(task);

@@ -1,4 +1,3 @@
-use futures::pin_mut;
 use futures::stream::StreamExt as _;
 use tokio::fs::remove_file;
 use tokio::pin;
@@ -151,8 +150,8 @@ impl Streaming for Services {
 }
 
 impl Shutdown for Services {
-    async fn shutdown(&self, shutdown_payload: ()) -> trapeze::Result<()> {
-        println!("> shutdown() - {:?}", shutdown_payload);
+    async fn shutdown(&self, _: ()) -> trapeze::Result<()> {
+        println!("> shutdown() - {:?}", get_context());
         get_server().shutdown();
         println!("> bye!");
         Ok(())
@@ -176,19 +175,14 @@ async fn main() {
     println!("Listening on {ADDRESS}");
     println!("Press Ctrl+C to exit.");
 
-    pin_mut!(handle);
+    let controller = handle.controller();
+    tokio::spawn(async move {
+        ctrl_c.await;
+        println!();
+        println!("Shutting down server");
+        controller.shutdown();
+    });
 
-    tokio::select! {
-        _ = ctrl_c => {
-            println!();
-            println!("Shutting down server");
-            handle.shutdown();
-            handle.await.expect("Error shutting down server");
-        },
-        res = &mut handle => {
-            println!();
-            res.expect("Error shutting down server");
-            println!("Server shutdown");
-        }
-    }
+    handle.await.expect("Error shutting down server");
+    println!("Server shutdown");
 }
