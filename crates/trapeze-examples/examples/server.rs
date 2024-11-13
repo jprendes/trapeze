@@ -1,3 +1,4 @@
+use futures::pin_mut;
 use futures::stream::StreamExt as _;
 use tokio::fs::remove_file;
 use tokio::pin;
@@ -5,12 +6,13 @@ use tokio::signal::ctrl_c;
 use tokio::time::sleep;
 use trapeze::prelude::Stream;
 use trapeze::stream::try_stream;
-use trapeze::{get_context, service, Code, Result, Server, Status};
+use trapeze::{get_context, get_server, service, Code, Result, Server, Status};
 
 mod common;
 
-use common::{grpc, streaming, types, ADDRESS};
+use common::{grpc, shutdown, streaming, types, ADDRESS};
 use grpc::*;
+use shutdown::*;
 use streaming::*;
 use types::*;
 
@@ -148,12 +150,21 @@ impl Streaming for Services {
     }
 }
 
+impl Shutdown for Services {
+    async fn shutdown(&self, shutdown_payload: ()) -> trapeze::Result<()> {
+        println!("> shutdown() - {:?}", shutdown_payload);
+        get_server().shutdown();
+        println!("> bye!");
+        Ok(())
+    }
+}
+
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     let _ = remove_file(ADDRESS).await;
 
     let handle = Server::new()
-        .register(service!(Services : Health + AgentService + Streaming))
+        .register(service!(Services : Health + AgentService + Streaming + Shutdown))
         .bind(ADDRESS)
         .await
         .expect("Error binding listener");
@@ -165,10 +176,19 @@ async fn main() {
     println!("Listening on {ADDRESS}");
     println!("Press Ctrl+C to exit.");
 
-    ctrl_c.await;
-    println!();
-    println!("Shutting down server");
+    pin_mut!(handle);
 
-    handle.shutdown();
-    handle.await.expect("Error shutting down server");
+    tokio::select! {
+        _ = ctrl_c => {
+            println!();
+            println!("Shutting down server");
+            handle.shutdown();
+            handle.await.expect("Error shutting down server");
+        },
+        res = &mut handle => {
+            println!();
+            res.expect("Error shutting down server");
+            println!("Server shutdown");
+        }
+    }
 }

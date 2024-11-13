@@ -7,9 +7,10 @@ use trapeze::{Client, ClientExt as _};
 
 mod common;
 
-use common::{grpc, streaming, ADDRESS};
+use common::{grpc, shutdown, streaming, ADDRESS};
 use grpc::*;
 use streaming::*;
+use shutdown::*;
 
 async fn grpc_check(client: Client, start: Instant) {
     let client = client
@@ -205,6 +206,16 @@ async fn streaming_echo_default_value(client: Client, start: Instant) {
     );
 }
 
+async fn shutdown_shutdown(client: Client, start: Instant) {
+    let res = client.shutdown(()).await;
+
+    println!(
+        "> shutdown.shutdown() -> {:?} ended: ({:?})",
+        res,
+        start.elapsed(),
+    );
+}
+
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     let client = Client::connect(ADDRESS).await.unwrap();
@@ -228,4 +239,7 @@ async fn main() {
         streaming_echo_null_stream(client.clone(), start),
         streaming_echo_default_value(client.clone(), start),
     );
+
+    shutdown_shutdown(client, start).await;
+
 }

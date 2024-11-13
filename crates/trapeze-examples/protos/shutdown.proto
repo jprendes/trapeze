@@ -1,0 +1,7 @@
+package ttrpc.test.shutdown;
+
+import "google/protobuf/empty.proto";
+
+service Shutdown {
+	rpc Shutdown(google.protobuf.Empty) returns (google.protobuf.Empty);
+}

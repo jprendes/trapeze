@@ -1,12 +1,11 @@
 use std::collections::HashMap;
-use std::io::{Error as IoError, ErrorKind, Result as IoResult};
+use std::io::{ErrorKind, Result as IoResult};
 use std::sync::Arc;
-use std::task::{ready, Poll};
 
-use futures::{pin_mut, Future, FutureExt};
+use controller::WithServerController;
+use futures::{pin_mut, FutureExt};
 use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::sync::Notify;
-use tokio::task::{JoinHandle, JoinSet};
+use tokio::task::JoinSet;
 
 use crate::context::timeout::Timeout;
 use crate::context::{Context, WithContext};
@@ -17,49 +16,17 @@ use crate::transport::{bind, Listener};
 use crate::types::frame::StreamFrame;
 use crate::types::protos::{Request, Status};
 
+pub mod controller;
+pub mod handle;
 pub mod method_handlers;
+
+pub use controller::{get_server, try_get_server, ServerController};
+pub use handle::ServerHandle;
 
 #[derive(Default)]
 pub struct Server {
     methods: HashMap<&'static str, Arc<dyn MethodHandler + Send + Sync>>,
     tasks: JoinSet<IoResult<()>>,
-}
-
-pub struct ServerHandle {
-    shutdown: Arc<Notify>,
-    handle: JoinHandle<IoResult<()>>,
-}
-
-impl Drop for ServerHandle {
-    fn drop(&mut self) {
-        self.handle.abort();
-    }
-}
-
-impl ServerHandle {
-    pub fn terminate(&self) {
-        self.handle.abort();
-    }
-
-    pub fn shutdown(&self) {
-        self.shutdown.notify_waiters();
-    }
-}
-
-impl Future for ServerHandle {
-    type Output = IoResult<()>;
-    fn poll(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Self::Output> {
-        match ready!(self.handle.poll_unpin(cx)) {
-            Ok(res) => Poll::Ready(res),
-            Err(_) => Poll::Ready(Err(IoError::new(
-                ErrorKind::Interrupted,
-                "TTRPC server terminated abruptly",
-            ))),
-        }
-    }
 }
 
 impl Server {
@@ -81,45 +48,39 @@ impl Server {
     }
 
     pub fn start(mut self, mut listener: impl Listener) -> ServerHandle {
-        let shutdown = Arc::new(Notify::new());
-        let handle = tokio::spawn({
-            let shutdown = shutdown.clone();
-            async move {
-                let shutdown = shutdown.notified().fuse();
-                pin_mut!(shutdown);
-                loop {
-                    tokio::select! {
-                        conn = listener.accept() => {
-                            let Ok(conn) = conn else {
-                                continue;
-                            };
-                            let methods = self.methods.clone();
-                            self.tasks.spawn(async move {
-                                ServerConnection::new_with_methods(conn, methods)
-                                    .start()
-                                    .await
-                            });
-                        },
-                        Some(res) = self.tasks.join_next() => {
-                            handle_task_result(res?);
-                        },
-                        () = &mut shutdown => break,
-                        else => break,
-                    }
+        ServerHandle::spawn(move |shutdown| async move {
+            let shutdown = shutdown.notified().fuse();
+            pin_mut!(shutdown);
+            loop {
+                tokio::select! {
+                    conn = listener.accept() => {
+                        let Ok(conn) = conn else {
+                            continue;
+                        };
+                        let methods = self.methods.clone();
+                        self.tasks.spawn(async move {
+                            ServerConnection::new_with_methods(conn, methods)
+                                .start()
+                                .await
+                        }.inherit_server());
+                    },
+                    Some(res) = self.tasks.join_next() => {
+                        handle_task_result(res?);
+                    },
+                    () = &mut shutdown => break,
+                    else => break,
                 }
-
-                drop(listener);
-
-                // drain any remaining tasks after a shutdown
-                while let Some(res) = self.tasks.join_next().await {
-                    handle_task_result(res?);
-                }
-
-                Ok(())
             }
-        });
 
-        ServerHandle { shutdown, handle }
+            drop(listener);
+
+            // drain any remaining tasks after a shutdown
+            while let Some(res) = self.tasks.join_next().await {
+                handle_task_result(res?);
+            }
+
+            Ok(())
+        })
     }
 }
 
@@ -239,7 +200,8 @@ impl ServerConnection {
                 }
                 Ok(())
             }
-            .with_context(ctx),
+            .with_context(ctx)
+            .inherit_server(),
         );
     }
 }

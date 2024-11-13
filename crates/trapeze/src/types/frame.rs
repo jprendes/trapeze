@@ -91,15 +91,13 @@ impl Decodeable for Frame<FallibleBytesMessage> {
         let ty = buf.get_u8().into();
         let flags = Flags::from_bits_retain(buf.get_u8());
 
-        let bytes = move || -> Result<Bytes, DecodeError> {
-            if length > MAX_DATA_LENGTH {
-                let msg = format!("Oversized payload: {length} bytes > {MAX_DATA_LENGTH} bytes");
-                return Err(DecodeError::InvalidInput(msg.into()));
-            }
-            buf.ensure_remaining(length)?;
-            let message = buf.copy_to_bytes(length);
-            Ok(message)
-        }();
+        let bytes = if length > MAX_DATA_LENGTH {
+            let msg = format!("Oversized payload: {length} bytes > {MAX_DATA_LENGTH} bytes");
+            Err(DecodeError::InvalidInput(msg.into()))
+        } else {
+            buf.ensure_remaining(length)
+                .map(|_| buf.copy_to_bytes(length))
+        };
         let bytes = bytes.into();
         let message = FallibleBytesMessage { ty, bytes };
 
