@@ -641,7 +641,7 @@ dependencies = [
 
 [[package]]
 name = "trapeze"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -662,14 +662,14 @@ dependencies = [
 
 [[package]]
 name = "trapeze-codegen"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "prost-build",
 ]
 
 [[package]]
 name = "trapeze-examples"
-version = "0.7.2"
+version = "0.0.0"
 dependencies = [
  "futures",
  "prost",
@@ -679,7 +679,7 @@ dependencies = [
 
 [[package]]
 name = "trapeze-macros"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "anyhow",
  "proc-macro2",

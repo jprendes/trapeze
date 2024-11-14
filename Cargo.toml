@@ -9,7 +9,7 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-version = "0.7.2"
+version = "0.7.3"
 license = "Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/jprendes/trapeze"
@@ -17,10 +17,10 @@ homepage = "https://github.com/jprendes/trapeze"
 
 [workspace.dependencies]
 # workspace packages
-trapeze = { path = "crates/trapeze", version = "0.7.0" }
-trapeze-codegen = { path = "crates/trapeze-codegen", version = "0.7.0" }
-trapeze-macros = { path = "crates/trapeze-macros", version = "0.7.0" }
-trapeze-examples = { path = "crates/trapeze-examples", version = "0.7.0" }
+trapeze = { path = "crates/trapeze", version = "0.7.3" }
+trapeze-codegen = { path = "crates/trapeze-codegen", version = "0.7.3" }
+trapeze-macros = { path = "crates/trapeze-macros", version = "0.7.3" }
+trapeze-examples = { path = "crates/trapeze-examples" }
 
 # common packages
 prost-build = "0.13"

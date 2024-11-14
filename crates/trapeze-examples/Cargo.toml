@@ -1,7 +1,6 @@
 [package]
 name = "trapeze-examples"
 description = "Examples for trapeze"
-version.workspace = true
 edition.workspace = true
 license.workspace = true
 readme.workspace = true
