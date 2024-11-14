@@ -59,7 +59,7 @@ pub fn get_server() -> ServerController {
 
 #[must_use]
 pub fn try_get_server() -> Option<ServerController> {
-    try_get_context().map(|ctx| ctx.server).flatten()
+    try_get_context().and_then(|ctx| ctx.server)
 }
 
 pub trait WithContext: Future {

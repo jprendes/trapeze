@@ -65,3 +65,9 @@ impl ServerHandle {
         ServerHandle { controller, handle }
     }
 }
+
+impl Default for ServerHandle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
