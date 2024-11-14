@@ -14,20 +14,22 @@ trapeze-macros = { workspace = true }
 prost = { workspace = true }
 prost-types = "0.13"
 tokio = { workspace = true, features = ["io-util", "rt", "sync", "time", "macros", "net"] }
-thiserror = "1"
+thiserror = "2"
 bitflags = "2"
 futures = "0.3"
 async-stream = "0.3"
 tokio-stream = "0.1"
 async-trait = "0.1"
 log = "0.4"
+anyhow = { version = "1", optional = true }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = "0.59"
 
 [target.'cfg(unix)'.dependencies]
-tokio-vsock = { version = "0.5", optional = true }
+tokio-vsock = { version = "0.6", optional = true }
 
 [features]
-default = [ "vsock" ]
+default = [ "vsock", "anyhow" ]
 vsock = [ "dep:tokio-vsock" ]
+anyhow = [ "dep:anyhow" ]

@@ -140,6 +140,19 @@ impl<T, E: ToString> StatusExt for Result<T, E> {
     }
 }
 
+impl From<std::io::Error> for Status {
+    fn from(error: std::io::Error) -> Self {
+        Status::internal(error.to_string())
+    }
+}
+
+#[cfg(feature = "anyhow")]
+impl From<anyhow::Error> for Status {
+    fn from(error: anyhow::Error) -> Self {
+        Status::internal(error.to_string())
+    }
+}
+
 fn code_to_str(code: i32) -> &'static str {
     let Ok(code) = Code::try_from(code) else {
         return "<None>";
