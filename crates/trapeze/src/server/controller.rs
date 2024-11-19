@@ -30,10 +30,7 @@ impl ServerController {
         let abort = self.abort.clone();
         let task = fut_fn();
         async move {
-            tokio::select! {
-                () = abort.cancelled() => { None },
-                val = task => { Some(val) },
-            }
+            abort.run_until_cancelled(task).await
         }
     }
 }

@@ -97,6 +97,7 @@ pub struct ServerConnection {
     io: MessageIo,
     methods: HashMap<&'static str, Arc<dyn MethodHandler + Send + Sync>>,
     tasks: JoinSet<IoResult<()>>,
+    io_tasks: JoinSet<IoResult<()>>,
     controller: ServerController,
 }
 
@@ -126,15 +127,17 @@ impl ServerConnection {
         connection: C,
         methods: impl Into<HashMap<&'static str, Arc<dyn MethodHandler + Send + Sync>>>,
     ) -> ServerConnection {
-        let mut tasks = JoinSet::<IoResult<()>>::new();
-        let io = MessageIo::new(&mut tasks, connection);
+        let mut io_tasks = JoinSet::<IoResult<()>>::new();
+        let io = MessageIo::new(&mut io_tasks, connection);
         let methods = methods.into();
         let controller = ServerController::default();
+        let tasks = JoinSet::<IoResult<()>>::new();
 
         ServerConnection {
             io,
             methods,
             tasks,
+            io_tasks,
             controller,
         }
     }
@@ -151,6 +154,9 @@ impl ServerConnection {
         pin_mut!(shutdown);
         loop {
             tokio::select! {
+                Some(res) = self.io_tasks.join_next() => {
+                    res??;
+                },
                 Some(res) = self.tasks.join_next() => {
                     res??;
                 },

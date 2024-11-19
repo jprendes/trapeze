@@ -239,6 +239,7 @@ async fn main() {
         streaming_echo_default_value(client.clone(), start),
     );
 
-    shutdown_shutdown(client, start).await;
+    shutdown_shutdown(client.clone(), start).await;
+    shutdown_shutdown(client.clone(), start).await;
 
 }
