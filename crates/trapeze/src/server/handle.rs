@@ -1,19 +1,16 @@
 use std::future::Future;
 use std::io::{Error as IoError, ErrorKind, Result as IoResult};
 use std::ops::Deref;
-use std::sync::Arc;
 use std::task::{ready, Poll};
 
-use futures::future::Aborted;
 use futures::FutureExt as _;
-use tokio::sync::Notify;
 use tokio::task::JoinHandle;
 
 use crate::server::controller::ServerController;
 
 pub struct ServerHandle {
     pub(super) controller: ServerController,
-    pub(super) handle: JoinHandle<Result<IoResult<()>, Aborted>>,
+    pub(super) handle: JoinHandle<Option<IoResult<()>>>,
 }
 
 impl ServerHandle {
@@ -43,7 +40,7 @@ impl Future for ServerHandle {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
         match ready!(self.handle.poll_unpin(cx)) {
-            Ok(Ok(res)) => Poll::Ready(res),
+            Ok(Some(res)) => Poll::Ready(res),
             _ => Poll::Ready(Err(IoError::new(
                 ErrorKind::Interrupted,
                 "TTRPC server terminated abruptly",
@@ -54,13 +51,19 @@ impl Future for ServerHandle {
 
 impl ServerHandle {
     pub fn new() -> Self {
-        Self::spawn(|_, _| async { Ok(()) })
+        Self::spawn(|_| async { Ok(()) })
     }
 
     pub(super) fn spawn<F: Future<Output = IoResult<()>> + Send + 'static>(
-        fut_fn: impl Send + 'static + FnOnce(ServerController, Arc<Notify>) -> F,
+        fut_fn: impl Send + 'static + FnOnce(ServerController) -> F,
     ) -> Self {
-        let (controller, task) = ServerController::control(fut_fn);
+        let controller = ServerController::new();
+        let task = controller.control({
+            let controller = controller.clone();
+            move || {
+                fut_fn(controller)
+            }
+        });
         let handle = tokio::spawn(task);
         ServerHandle { controller, handle }
     }

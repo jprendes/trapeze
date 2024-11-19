@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::io::{ErrorKind, Result as IoResult};
 use std::sync::Arc;
 
-use futures::{pin_mut, FutureExt};
+use futures::pin_mut;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::task::JoinSet;
 
@@ -47,8 +47,8 @@ impl Server {
     }
 
     pub fn start(mut self, mut listener: impl Listener) -> ServerHandle {
-        ServerHandle::spawn(move |controller, shutdown| async move {
-            let shutdown = shutdown.notified().fuse();
+        ServerHandle::spawn(move |controller| async move {
+            let shutdown = controller.shutdown.cancelled();
             pin_mut!(shutdown);
             loop {
                 tokio::select! {
@@ -97,7 +97,7 @@ pub struct ServerConnection {
     io: MessageIo,
     methods: HashMap<&'static str, Arc<dyn MethodHandler + Send + Sync>>,
     tasks: JoinSet<IoResult<()>>,
-    controller: Option<ServerController>,
+    controller: ServerController,
 }
 
 impl ServerConnection {
@@ -118,7 +118,7 @@ impl ServerConnection {
     }
 
     fn with_controller(&mut self, controller: ServerController) -> &mut Self {
-        self.controller = Some(controller);
+        self.controller = controller;
         self
     }
 
@@ -129,7 +129,7 @@ impl ServerConnection {
         let mut tasks = JoinSet::<IoResult<()>>::new();
         let io = MessageIo::new(&mut tasks, connection);
         let methods = methods.into();
-        let controller = None;
+        let controller = ServerController::default();
 
         ServerConnection {
             io,
@@ -146,6 +146,9 @@ impl ServerConnection {
     }
 
     pub async fn start(&mut self) -> IoResult<()> {
+        let shutdown = self.controller.shutdown.clone();
+        let shutdown = shutdown.cancelled();
+        pin_mut!(shutdown);
         loop {
             tokio::select! {
                 Some(res) = self.tasks.join_next() => {
@@ -154,6 +157,7 @@ impl ServerConnection {
                 Some((id, frame)) = self.io.rx.recv() => {
                     self.handle_message(id, &frame);
                 },
+                () = &mut shutdown, if self.tasks.is_empty() => break,
                 else => {
                     // no more messages to read, and no more taks to process
                     // we are done

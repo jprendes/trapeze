@@ -20,7 +20,7 @@ pub struct Context {
 
 #[derive(Clone)]
 pub struct ServerContext {
-    pub server: Option<ServerController>,
+    pub server: ServerController,
     context: Arc<Context>,
 }
 
@@ -54,26 +54,26 @@ pub fn try_get_context() -> Option<ServerContext> {
 
 #[must_use]
 pub fn get_server() -> ServerController {
-    get_context().server.unwrap()
+    get_context().server
 }
 
 #[must_use]
 pub fn try_get_server() -> Option<ServerController> {
-    try_get_context().and_then(|ctx| ctx.server)
+    try_get_context().map(|ctx| ctx.server)
 }
 
-pub trait WithContext: Future {
+pub(crate) trait WithContext: Future {
     fn with_context(
         self,
         ctx: impl Into<Arc<Context>>,
-        controller: impl Into<Option<ServerController>>,
+        server: ServerController,
     ) -> TaskLocalFuture<ServerContext, Self>
     where
         Self: Sized,
     {
         CONTEXT.scope(
             ServerContext {
-                server: controller.into(),
+                server,
                 context: ctx.into(),
             },
             self,

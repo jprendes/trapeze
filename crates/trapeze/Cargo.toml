@@ -19,6 +19,7 @@ bitflags = "2"
 futures = "0.3"
 async-stream = "0.3"
 tokio-stream = "0.1"
+tokio-util = "0.7"
 async-trait = "0.1"
 log = "0.4"
 anyhow = { version = "1", optional = true }
