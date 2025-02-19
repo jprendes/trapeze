@@ -29,8 +29,6 @@ impl ServerController {
     ) -> impl Future<Output = Option<F::Output>> + Send {
         let abort = self.abort.clone();
         let task = fut_fn();
-        async move {
-            abort.run_until_cancelled(task).await
-        }
+        async move { abort.run_until_cancelled(task).await }
     }
 }

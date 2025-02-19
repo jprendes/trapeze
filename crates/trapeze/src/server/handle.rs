@@ -60,9 +60,7 @@ impl ServerHandle {
         let controller = ServerController::new();
         let task = controller.control({
             let controller = controller.clone();
-            move || {
-                fut_fn(controller)
-            }
+            move || fut_fn(controller)
         });
         let handle = tokio::spawn(task);
         ServerHandle { controller, handle }

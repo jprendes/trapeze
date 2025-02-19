@@ -5,8 +5,7 @@ trapeze::include_protos!([
     "protos/shutdown.proto",
 ]);
 
-pub use ttrpc::test::streaming;
-pub use ttrpc::test::shutdown;
+pub use ttrpc::test::{shutdown, streaming};
 
 #[cfg(unix)]
 pub const ADDRESS: &str = "unix:///tmp/ttrpc-test";

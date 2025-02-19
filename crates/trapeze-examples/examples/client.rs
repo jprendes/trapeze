@@ -8,8 +8,8 @@ mod common;
 
 use common::{grpc, shutdown, streaming, ADDRESS};
 use grpc::*;
-use streaming::*;
 use shutdown::*;
+use streaming::*;
 
 async fn grpc_check(client: Client, start: Instant) {
     let client = client
@@ -241,5 +241,4 @@ async fn main() {
 
     shutdown_shutdown(client.clone(), start).await;
     shutdown_shutdown(client.clone(), start).await;
-
 }
