@@ -85,21 +85,19 @@ impl RequestHandler for Client {
         let metadata = self.context.metadata.keyvalue_iter().collect();
         let timeout = self.context.timeout;
 
-        let fut = self.spawn_stream(move |mut stream| async move {
-            stream
-                .tx
-                .send(StreamFrame {
-                    flags: Flags::empty(),
-                    message: Request {
-                        service,
-                        method,
-                        payload,
-                        metadata,
-                        timeout_nano: timeout.as_nanos(),
-                    },
-                })
-                .await
-                .map_err(Status::send_error)?;
+        let frame = StreamFrame {
+            flags: Flags::empty(),
+            message: Request {
+                service,
+                method,
+                payload,
+                metadata,
+                timeout_nano: timeout.as_nanos(),
+            },
+        };
+
+        let fut = self.spawn_stream(frame, move |res, mut stream| async move {
+            res.await.map_err(Status::send_error)?;
 
             let rx = RwLock::new(&mut stream.rx);
 
@@ -136,21 +134,19 @@ impl RequestHandler for Client {
         let metadata = self.context.metadata.keyvalue_iter().collect();
         let timeout = self.context.timeout;
 
-        let fut = self.spawn_stream(move |mut stream| async move {
-            stream
-                .tx
-                .send(StreamFrame {
-                    flags: Flags::REMOTE_CLOSED,
-                    message: Request {
-                        service,
-                        method,
-                        payload,
-                        metadata,
-                        timeout_nano: timeout.as_nanos(),
-                    },
-                })
-                .await
-                .map_err(Status::send_error)?;
+        let frame = StreamFrame {
+            flags: Flags::REMOTE_CLOSED,
+            message: Request {
+                service,
+                method,
+                payload,
+                metadata,
+                timeout_nano: timeout.as_nanos(),
+            },
+        };
+
+        let fut = self.spawn_stream(frame, move |res, mut stream| async move {
+            res.await.map_err(Status::send_error)?;
 
             let rx = RwLock::new(&mut stream.rx);
 
@@ -195,21 +191,19 @@ impl RequestHandler for Client {
         let metadata = self.context.metadata.keyvalue_iter().collect();
         let timeout = self.context.timeout;
 
-        let fut = self.spawn_stream(move |mut stream| async move {
-            stream
-                .tx
-                .send(StreamFrame {
-                    flags: Flags::REMOTE_OPEN | Flags::NO_DATA,
-                    message: Request {
-                        service,
-                        method,
-                        payload: (),
-                        metadata,
-                        timeout_nano: timeout.as_nanos(),
-                    },
-                })
-                .await
-                .map_err(Status::send_error)?;
+        let frame = StreamFrame {
+            flags: Flags::REMOTE_OPEN | Flags::NO_DATA,
+            message: Request {
+                service,
+                method,
+                payload: (),
+                metadata,
+                timeout_nano: timeout.as_nanos(),
+            },
+        };
+
+        let fut = self.spawn_stream(frame, move |res, mut stream| async move {
+            res.await.map_err(Status::send_error)?;
 
             let rx = RwLock::new(&mut stream.rx);
 
@@ -250,21 +244,19 @@ impl RequestHandler for Client {
         let metadata = self.context.metadata.keyvalue_iter().collect();
         let timeout = self.context.timeout;
 
-        let fut = self.spawn_stream(move |mut stream| async move {
-            stream
-                .tx
-                .send(StreamFrame {
-                    flags: Flags::REMOTE_OPEN | Flags::NO_DATA,
-                    message: Request {
-                        service,
-                        method,
-                        payload: (),
-                        metadata,
-                        timeout_nano: timeout.as_nanos(),
-                    },
-                })
-                .await
-                .map_err(Status::send_error)?;
+        let frame = StreamFrame {
+            flags: Flags::REMOTE_OPEN | Flags::NO_DATA,
+            message: Request {
+                service,
+                method,
+                payload: (),
+                metadata,
+                timeout_nano: timeout.as_nanos(),
+            },
+        };
+
+        let fut = self.spawn_stream(frame, move |res, mut stream| async move {
+            res.await.map_err(Status::send_error)?;
 
             let rx = RwLock::new(&mut stream.rx);
 

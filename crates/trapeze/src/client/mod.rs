@@ -12,8 +12,11 @@ use tokio::task::JoinSet;
 use crate::context::metadata::Metadata;
 use crate::context::timeout::Timeout;
 use crate::context::Context;
-use crate::io::{MessageIo, StreamIo};
+use crate::io::{MessageIo, SendResult, StreamIo};
 use crate::transport::connect;
+use crate::types::encoding::Encodeable;
+use crate::types::frame::StreamFrame;
+use crate::types::message::Message;
 use crate::{Result, Status};
 
 pub mod request_handlers;
@@ -107,14 +110,16 @@ impl Client {
         Ok(Self::new(conn))
     }
 
-    fn spawn_stream<Fut: Future<Output = Result<()>> + Send>(
+    fn spawn_stream<Fut: Future<Output = Result<()>> + Send, Msg: Message + Encodeable>(
         &self,
-        f: impl FnOnce(StreamIo) -> Fut + Send + 'static,
+        frame: impl Into<StreamFrame<Msg>> + Send + 'static,
+        f: impl FnOnce(SendResult, StreamIo) -> Fut + Send + 'static,
     ) -> impl Future<Output = Result<()>> + Send {
         let (tx, rx) = oneshot::channel();
         let _ = self.tx.send(Box::new(move |stream, tasks| {
+            let res = stream.tx.send(frame);
             tasks.spawn(async move {
-                let _ = tx.send(f(stream).await);
+                let _ = tx.send(f(res, stream).await);
                 Ok(())
             });
         }));
